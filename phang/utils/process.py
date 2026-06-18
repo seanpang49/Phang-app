@@ -7,7 +7,7 @@ import logging
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +16,15 @@ def run_streaming(
     cmd: List[str],
     log_path: Optional[Path] = None,
     cwd: Optional[Path] = None,
+    env: Optional[Dict[str, str]] = None,
 ) -> int:
     """
     Run *cmd*, stream combined stdout/stderr live to the terminal, and
     optionally write everything to *log_path*.
+
+    *env*, when given, replaces the child process environment (pass a copy of
+    os.environ with your overrides). When None the parent environment is
+    inherited unchanged.
 
     Returns the process exit code.
     """
@@ -42,6 +47,7 @@ def run_streaming(
             text=True,
             bufsize=1,
             cwd=str(cwd) if cwd else None,
+            env=env,
         )
         assert proc.stdout is not None
 
