@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "phang"
+version = "0.2.0"
+description = "End-to-end phage genome analysis pipeline (merged: Windows cross-platform + Mac defense/therapy fixes)"
+requires-python = ">=3.10"
+dependencies = [
+    "biopython>=1.83",
+    "jinja2>=3.1",
+    "pyCirclize>=1.0",
+    "matplotlib>=3.8",
+    "pyarrow>=14.0",
+    "pandas>=2.0",
+    "tkinterdnd2>=0.3",
+]
+
+[project.scripts]
+phang = "phang.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["phang*"]
