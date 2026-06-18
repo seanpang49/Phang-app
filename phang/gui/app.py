@@ -19,7 +19,7 @@ from typing import List, Optional
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
 
-from phang.config import VERSION
+from phang.config import FASTA_EXTENSIONS, VERSION
 
 logger = logging.getLogger(__name__)
 
@@ -208,7 +208,7 @@ class PhangApp(tk.Tk):
                          cursor="hand2")
         frame.pack(fill="x", pady=(0, 6))
         lbl = tk.Label(frame,
-                       text="Drop .fasta / .fa / .fna files here\nor click Browse",
+                       text="Drop FASTA files or a folder here\nor use the buttons below",
                        font=FONT_SANS, bg=BG_INPUT, fg=TEXT_MUTED, pady=18)
         lbl.pack()
         # Bind click to browse
@@ -240,11 +240,17 @@ class PhangApp(tk.Tk):
     def _build_file_buttons(self, parent: tk.Frame) -> None:
         row = tk.Frame(parent, bg=BG)
         row.pack(fill="x")
-        tk.Button(row, text="Browse…", font=FONT_SANS,
+        # Primary: choose a whole folder (expanded recursively into FASTA files).
+        tk.Button(row, text="Choose folder…", font=FONT_SANS,
+                  bg=ACCENT, fg="white", relief="flat",
+                  activebackground="#4f46e5", activeforeground="white",
+                  cursor="hand2", padx=12, pady=4,
+                  command=self._browse_folder).pack(side="left")
+        tk.Button(row, text="Add files…", font=FONT_SANS,
                   bg=BG_INPUT, fg=TEXT, relief="flat",
                   activebackground=BORDER, cursor="hand2",
                   padx=12, pady=4,
-                  command=self._browse_files).pack(side="left")
+                  command=self._browse_files).pack(side="left", padx=(6, 0))
         tk.Button(row, text="Clear", font=FONT_SANS,
                   bg=BG_INPUT, fg=TEXT_MUTED, relief="flat",
                   activebackground=BORDER, cursor="hand2",
@@ -284,12 +290,10 @@ class PhangApp(tk.Tk):
     # ── Event handlers ───────────────────────────────────────────────────────
 
     def _on_drop(self, event) -> None:
-        """Handle drag-and-drop file event."""
-        raw = event.data
+        """Handle drag-and-drop of FASTA files and/or folders."""
         # tkinterdnd2 returns paths possibly wrapped in {} for paths with spaces
-        paths = self.tk.splitlist(raw)
-        new = [Path(p) for p in paths if Path(p).suffix.lower() in {".fasta", ".fa", ".fna"}]
-        self._add_files(new)
+        paths = [Path(p) for p in self.tk.splitlist(event.data)]
+        self._add_paths(paths)
 
     def _browse_files(self) -> None:
         paths = filedialog.askopenfilenames(
@@ -297,6 +301,12 @@ class PhangApp(tk.Tk):
             filetypes=[("FASTA files", "*.fasta *.fa *.fna"), ("All files", "*.*")],
         )
         self._add_files([Path(p) for p in paths])
+
+    def _browse_folder(self) -> None:
+        """Pick a folder and expand it recursively into FASTA files."""
+        d = filedialog.askdirectory(title="Choose a folder of FASTA files")
+        if d:
+            self._add_paths([Path(d)])
 
     def _clear_files(self) -> None:
         self._fasta_files.clear()
@@ -307,6 +317,30 @@ class PhangApp(tk.Tk):
         if d:
             self._output_dir = Path(d)
             self._out_label.config(text=str(self._output_dir), fg=TEXT)
+
+    def _add_paths(self, paths: List[Path]) -> None:
+        """Accept a mix of FASTA files and folders; expand folders recursively."""
+        from phang.utils.fasta import find_fasta_files
+
+        collected: List[Path] = []
+        for p in paths:
+            if p.is_dir():
+                try:
+                    collected.extend(find_fasta_files(p, recursive=True))
+                except ValueError:
+                    logger.warning("No FASTA files found in folder: %s", p)
+            elif p.suffix.lower() in FASTA_EXTENSIONS:
+                collected.append(p)
+            else:
+                logger.warning("Ignoring non-FASTA path: %s", p)
+
+        if not collected:
+            messagebox.showwarning(
+                "No FASTA files",
+                "No .fasta / .fa / .fna files were found in what you added.",
+            )
+            return
+        self._add_files(collected)
 
     def _add_files(self, paths: List[Path]) -> None:
         for p in paths:
