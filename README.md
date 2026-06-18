@@ -4,6 +4,23 @@
 
 Phang is a local phage-genomics pipeline that takes one or more phage FASTA files and produces an NCBI BankIt submission package, an interactive HTML report card, and a full set of organized intermediate analysis outputs.
 
+## Easy install (beta)
+
+The simplest way to run Phang — no terminal, no conda setup. Download the installer for your platform from the **Releases** page and run it.
+
+### macOS (Apple Silicon)
+
+1. Download `Phang-<version>-osx-arm64.pkg` and double-click it to install.
+2. Open **Phang** from your Applications folder. This beta is **unsigned**, so the first time you open it macOS will warn that it "cannot be opened because Apple cannot check it for malicious software." **Right-click (Control-click) the Phang app → Open**, then click **Open** in the dialog. You only do this once. _(Alternatively: System Settings → Privacy & Security → "Open Anyway".)_
+3. On first launch, Phang downloads its analysis tools and reference databases (~30 GB) into `~/.phang`. A progress window shows the status — keep it open. You can quit to pause; it resumes next time and finished downloads are kept.
+4. When setup finishes, drag a folder of FASTA files onto the window and click **Run Pipeline**.
+
+> Requires an Apple Silicon Mac (M1 or later), macOS 11+, ~35 GB free disk space, and an internet connection for the one-time first-run setup. Runs natively on Apple Silicon (no Rosetta).
+
+_A Windows (WSL2) one-click installer is in progress._
+
+Prefer to install from source, or running on Intel Mac / Linux / Windows today? Use the developer instructions below.
+
 ## Supported Platforms
 
 | Platform | Support |

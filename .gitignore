@@ -15,3 +15,8 @@ dist/
 
 # Local environment / runtime artifacts
 *.log
+
+# Packaging build outputs
+packaging/mac/out/
+packaging/mac/dist/
+packaging/mac/Phang.icns

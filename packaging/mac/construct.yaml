@@ -1,0 +1,82 @@
+# Phang — Apple Silicon (osx-arm64) one-click installer.
+#
+# Built with conda `constructor` (see build.sh). Produces an unsigned .pkg for
+# the beta — users approve it once via Gatekeeper's "Open anyway" (documented in
+# README.md). Notarization + an Apple Developer ID signature come later.
+#
+# What the .pkg ships: a self-contained conda base env (Python + conda + the
+# phang GUI's runtime dependencies) with the `phang` package installed into it
+# by post_install.sh, plus an /Applications/Phang.app launcher.
+#
+# What it does NOT ship: the 9 analysis tool-envs and their ~30 GB of databases.
+# Those are installed on FIRST LAUNCH by `phang bootstrap` (wired into the GUI),
+# where the work runs per-user with a visible, resumable progress UI rather than
+# as root inside this installer.
+
+name: Phang
+version: 0.2.0
+company: Phang
+
+# Apple Silicon only for this beta (see plan: Intel deferred).
+channels:
+  - conda-forge
+
+# Base environment contents. These are the phang GUI's own runtime deps — every
+# PyPI dependency from pyproject.toml that is available on conda-forge is baked
+# in here so the base env is offline-complete. The lone exception, tkinterdnd2
+# (drag-and-drop; not on conda-forge), is pip-installed by post_install.sh and
+# is non-fatal (the GUI falls back to click-to-browse without it).
+specs:
+  - python 3.11.*
+  - conda
+  - conda-libmamba-solver   # fast solver for the first-run tool-env bootstrap
+  - pip
+  - tk                      # tkinter GUI toolkit
+  - git                     # some tool installers fetch from git during bootstrap
+  - ca-certificates
+  - openssl
+  - pandas
+  - pyarrow
+  - matplotlib-base
+  - biopython
+  - jinja2
+  - pycirclize
+
+# Files copied into the install prefix root, consumed by post_install.sh.
+extra_files:
+  - dist/phang-0.2.0-py3-none-any.whl
+  - Phang.icns
+
+installer_type: pkg
+
+# Do not touch the user's shell: the launcher puts the base env on PATH itself,
+# so we never run `conda init` or register a default Python.
+initialize_conda: false
+initialize_by_default: false
+
+post_install: post_install.sh
+
+# Unsigned beta — intentionally no signing_identity_name / notarization_identity_name.
+
+welcome_text: |
+  Phang — Phage Genome Analysis Pipeline (Apple Silicon beta)
+
+  This installs the Phang application. The first time you open it, Phang
+  downloads its analysis tools and reference databases (about 30 GB) — so keep
+  a fast internet connection and free disk space available for first launch.
+
+readme_text: |
+  This is an UNSIGNED beta build. After installing, the first time you open
+  Phang macOS may say it "cannot be opened because Apple cannot check it for
+  malicious software." Right-click (or Control-click) Phang in /Applications and
+  choose "Open", then confirm "Open" in the dialog. You only do this once.
+
+  First launch downloads ~30 GB of tools and databases into ~/.phang. A progress
+  window shows the status; you can quit to pause and it resumes next time.
+
+conclusion_text: |
+  Phang is installed in /Applications.
+
+  Open it from your Applications folder (right-click → Open the first time, since
+  this beta is unsigned). On first launch it will set itself up by downloading
+  the analysis tools and databases — keep the window open.
