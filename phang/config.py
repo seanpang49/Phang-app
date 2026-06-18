@@ -2,12 +2,16 @@
 Central configuration: all paths and constants for the phang pipeline.
 """
 
+import os
 from pathlib import Path
 
 VERSION = "0.2.0"
 
-# --- Base directories (under user home, not project root) ---
-PHANG_HOME = Path.home() / ".phang"
+# --- Base directories ---
+# Defaults to ~/.phang, but the PHANG_HOME environment variable takes
+# precedence so installers (Mac .pkg post-install, Windows launcher) can
+# place data deliberately without relying on a fragile HOME override.
+PHANG_HOME = Path(os.environ.get("PHANG_HOME") or Path.home() / ".phang")
 ENVS_DIR = PHANG_HOME / "envs"
 DB_DIR = PHANG_HOME / "databases"
 
