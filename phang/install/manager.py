@@ -12,13 +12,21 @@ first; if WSL2 is absent a descriptive error is raised.
 
 The ML-only tools (rbpdetect, deposcope) use pip-installable PyTorch and can
 run natively on Windows with CUDA GPU support.
+
+Status API
+----------
+``ensure_all_detailed()`` returns structured :class:`ToolStatus` objects so
+callers (the GUI, the first-run bootstrap) can distinguish *ok* / *skipped* /
+*failed* without string-parsing.  ``ensure_all()`` is kept as a thin
+backward-compatible wrapper that returns the legacy ``{tool: status_string}``
+mapping older consumers (cli.py, the step modules) still rely on.
 """
 
 from __future__ import annotations
 
 import importlib
 import logging
-import sys
+from dataclasses import dataclass
 
 logger = logging.getLogger(__name__)
 
@@ -37,17 +45,46 @@ _TOOLS = [
 ]
 
 
-def ensure_all() -> dict[str, str]:
-    """
-    Run ensure_*() for every tool.
+@dataclass
+class ToolStatus:
+    """Structured per-tool install outcome (consumed by the GUI / bootstrap)."""
 
-    Returns a dict mapping tool name → installed version / status string.
-    Raises SystemExit if a fatal tool fails to install.
-    On Windows without WSL2, Bioconda-dependent tools are skipped with a warning
-    rather than crashing the entire pipeline; only the native Windows tools
-    (rbpdetect, deposcope) are installed.
+    name: str
+    state: str            # "ok" | "skipped" | "failed"
+    version: str = ""     # installed version when state == "ok"
+    message: str = ""     # skip reason or error text
+    fatal: bool = False   # whether a failure here aborts the pipeline
+
+    @property
+    def ok(self) -> bool:
+        return self.state == "ok"
+
+    @property
+    def legacy(self) -> str:
+        """Backward-compatible status string (older consumers parse this).
+
+        - "ok"      → the version string
+        - "skipped" → the skip reason
+        - "failed"  → "FAILED: <error>"  (matched via str.startswith elsewhere)
+        """
+        if self.state == "ok":
+            return self.version
+        if self.state == "skipped":
+            return self.message or "skipped"
+        return f"FAILED: {self.message}"
+
+
+def ensure_all_detailed() -> dict[str, "ToolStatus"]:
     """
-    from phang.utils.wsl import is_windows, has_wsl2, check_windows_requirements
+    Run ensure_*() for every tool and return structured per-tool status.
+
+    Returns a dict mapping tool name → :class:`ToolStatus`.
+    Raises SystemExit if a fatal tool (pharokka) fails to install.
+    On Windows without WSL2, Bioconda-dependent tools are reported as
+    ``skipped`` rather than crashing the entire pipeline; only the native
+    Windows tools (rbpdetect, deposcope) are installed.
+    """
+    from phang.utils.wsl import is_windows, has_wsl2
 
     on_windows = is_windows()
     wsl2_available = has_wsl2() if on_windows else False
@@ -61,13 +98,17 @@ def ensure_all() -> dict[str, str]:
             "Install WSL2 and re-run for the full pipeline."
         )
 
-    results: dict[str, str] = {}
+    results: dict[str, ToolStatus] = {}
     failed: list[str] = []
 
     for tool_name, module_path, func_name, is_fatal, bioconda_required in _TOOLS:
         # On Windows without WSL2, skip Bioconda tools gracefully.
         if on_windows and not wsl2_available and bioconda_required:
-            results[tool_name] = "skipped (Windows — WSL2 required)"
+            results[tool_name] = ToolStatus(
+                name=tool_name,
+                state="skipped",
+                message="skipped (Windows — WSL2 required)",
+            )
             logger.info("  %s: skipped (Bioconda, WSL2 not available)", tool_name)
             continue
 
@@ -76,11 +117,15 @@ def ensure_all() -> dict[str, str]:
             mod = importlib.import_module(module_path)
             func = getattr(mod, func_name)
             version = func()
-            results[tool_name] = version
+            results[tool_name] = ToolStatus(
+                name=tool_name, state="ok", version=str(version),
+            )
             logger.info("  %s: OK (%s)", tool_name, version)
         except Exception as exc:
             logger.error("  %s: FAILED — %s", tool_name, exc)
-            results[tool_name] = f"FAILED: {exc}"
+            results[tool_name] = ToolStatus(
+                name=tool_name, state="failed", message=str(exc), fatal=is_fatal,
+            )
             if is_fatal:
                 failed.append(tool_name)
 
@@ -91,3 +136,15 @@ def ensure_all() -> dict[str, str]:
         )
 
     return results
+
+
+def ensure_all() -> dict[str, str]:
+    """
+    Backward-compatible wrapper around :func:`ensure_all_detailed`.
+
+    Returns a dict mapping tool name → legacy status string (the installed
+    version on success, ``"FAILED: …"`` on error, or the skip reason). Existing
+    consumers (cli.py, the step modules) string-match these values, so the
+    format is preserved.
+    """
+    return {name: status.legacy for name, status in ensure_all_detailed().items()}
