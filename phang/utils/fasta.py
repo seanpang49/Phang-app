@@ -14,11 +14,13 @@ from phang.config import FASTA_EXTENSIONS
 logger = logging.getLogger(__name__)
 
 
-def find_fasta_files(path: Path) -> List[Path]:
+def find_fasta_files(path: Path, recursive: bool = False) -> List[Path]:
     """
     Given *path*:
     - If it is a file with a recognised FASTA extension, return [path].
-    - If it is a directory, return all FASTA files (non-recursive, sorted).
+    - If it is a directory, return all FASTA files (sorted). The search is flat
+      (top level only) by default; pass *recursive=True* to descend into
+      subdirectories — used by the GUI when a user drops a whole folder.
     - If it is a multi-record FASTA file, return [path] (split handled elsewhere).
     """
     if path.is_file():
@@ -27,8 +29,9 @@ def find_fasta_files(path: Path) -> List[Path]:
         raise ValueError(f"File does not have a recognised FASTA extension: {path}")
 
     if path.is_dir():
+        candidates = path.rglob("*") if recursive else path.iterdir()
         files = sorted(
-            p for p in path.iterdir()
+            p for p in candidates
             if p.is_file() and p.suffix.lower() in FASTA_EXTENSIONS
         )
         if not files:
