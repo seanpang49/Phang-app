@@ -83,12 +83,18 @@ class PhangApp(tk.Tk):
         self._output_dir: Optional[Path] = None
         self._mode = tk.StringVar(value="individual")
         self._running = False
+        self._setup_running = False
         self._queue: queue.Queue = queue.Queue()
         self._current_step = 0
         self._result_paths: List[Path] = []
 
         self._build_ui()
         self._center_window()
+
+        # First launch only: install the 9 tool envs + download databases before
+        # the pipeline can run. Deferred so the window paints first. Idempotent —
+        # a completed bootstrap writes a manifest and this becomes a no-op.
+        self.after(300, self._maybe_first_run_setup)
 
     # ── Icon ─────────────────────────────────────────────────────────────────
 
@@ -351,6 +357,13 @@ class PhangApp(tk.Tk):
     def _on_run(self) -> None:
         if self._running:
             return
+        if self._setup_running:
+            messagebox.showinfo(
+                "Setup in progress",
+                "Phang is still completing its one-time setup (installing tools and "
+                "downloading databases). Please wait until setup finishes.",
+            )
+            return
         if not self._fasta_files:
             messagebox.showwarning("No files", "Please add at least one FASTA file.")
             return
@@ -507,6 +520,134 @@ class PhangApp(tk.Tk):
         for path in self._result_paths:
             if path.exists():
                 webbrowser.open(path.as_uri())
+
+    # ── First-run setup (one-time bootstrap) ──────────────────────────────────
+
+    _SETUP_TOOLS = [
+        "pharokka", "phold", "phynteny", "phastyle", "phabox2",
+        "defensefinder", "vcontact3", "rbpdetect", "deposcope",
+    ]
+
+    def _maybe_first_run_setup(self) -> None:
+        """Run the one-time bootstrap on first launch (install tools + DBs).
+
+        Skipped silently once a previous bootstrap has completed. If the install
+        machinery can't be imported we simply continue — ``run_pipeline`` calls
+        ``ensure_all`` itself, so the tools still get installed on first run.
+        """
+        try:
+            from phang.install.bootstrap import is_bootstrapped
+        except Exception:
+            return
+        if is_bootstrapped():
+            return
+        self._start_first_run_setup()
+
+    def _start_first_run_setup(self) -> None:
+        self._setup_running = True
+        self._run_btn.config(state="disabled", text="Setting up…")
+        self._status_label.config(
+            text="First-time setup: installing the 9 analysis tools and downloading "
+                 "their databases (~30 GB). This happens once and can take a while on "
+                 "a fast connection. Keep this window open — quitting pauses setup and "
+                 "it resumes next time (finished downloads are kept).",
+            fg=AMBER,
+        )
+        self._step_label.config(text="Preparing setup…", fg=TEXT_MUTED)
+        self._progress.config(mode="determinate", maximum=len(self._SETUP_TOOLS))
+        self._progress["value"] = 0
+        self._pct_label.config(text="0%")
+
+        # Stream the install logs into the GUI via the same queue the pipeline uses.
+        handler = _QueueHandler(self._queue)
+        handler.setFormatter(logging.Formatter("%(message)s"))
+        handler.setLevel(logging.INFO)
+        root_logger = logging.getLogger()
+        root_logger.addHandler(handler)
+        root_logger.setLevel(logging.DEBUG)
+        self._setup_log_handler = handler
+
+        threading.Thread(
+            target=self._bootstrap_thread, args=(self._queue,), daemon=True
+        ).start()
+        self.after(100, self._poll_setup_queue)
+
+    def _bootstrap_thread(self, q: queue.Queue) -> None:
+        """Run in a background thread — never touch tkinter widgets from here."""
+        try:
+            from phang.install.bootstrap import bootstrap
+            bootstrap()
+            q.put(("setup_done", None))
+        except BaseException as exc:  # SystemExit (fatal pharokka) included
+            q.put(("setup_error", str(exc) or exc.__class__.__name__))
+
+    def _poll_setup_queue(self) -> None:
+        try:
+            while True:
+                msg_type, data = self._queue.get_nowait()
+                if msg_type == "log":
+                    self._handle_setup_log(data)
+                elif msg_type == "setup_done":
+                    self._on_setup_done()
+                    return
+                elif msg_type == "setup_error":
+                    self._on_setup_error(data)
+                    return
+        except queue.Empty:
+            pass
+        if self._setup_running:
+            self.after(100, self._poll_setup_queue)
+
+    def _handle_setup_log(self, message: str) -> None:
+        text = message.strip()
+        if text:
+            self._step_label.config(text=text[:80], fg=TEXT_MUTED)
+        # The install manager logs "Checking tool: <name>" as each tool begins.
+        low = message.lower()
+        if "checking tool:" in low:
+            name = low.split("checking tool:", 1)[1].strip()
+            if name in self._SETUP_TOOLS:
+                idx = self._SETUP_TOOLS.index(name) + 1
+                self._progress["value"] = idx
+                self._pct_label.config(
+                    text=f"{int(idx / len(self._SETUP_TOOLS) * 100)}%"
+                )
+
+    def _finish_setup_logging(self) -> None:
+        handler = getattr(self, "_setup_log_handler", None)
+        if handler is not None:
+            logging.getLogger().removeHandler(handler)
+            self._setup_log_handler = None
+
+    def _reset_progress_for_pipeline(self) -> None:
+        self._progress.config(mode="determinate", maximum=self.TOTAL_STEPS)
+        self._progress["value"] = 0
+        self._pct_label.config(text="")
+
+    def _on_setup_done(self) -> None:
+        self._setup_running = False
+        self._finish_setup_logging()
+        self._progress["value"] = len(self._SETUP_TOOLS)
+        self._pct_label.config(text="100%")
+        self._step_label.config(
+            text="✅  Setup complete — ready to analyse phages.", fg=GREEN
+        )
+        self._status_label.config(text="", fg=TEXT)
+        self._run_btn.config(state="normal", text="▶  Run Pipeline")
+        self._reset_progress_for_pipeline()
+
+    def _on_setup_error(self, error: str) -> None:
+        self._setup_running = False
+        self._finish_setup_logging()
+        self._step_label.config(text="❌  Setup failed.", fg=RED)
+        self._status_label.config(
+            text=f"First-run setup failed: {error}\n\nQuit and reopen Phang to retry — "
+                 f"finished downloads are kept. Full details are in "
+                 f"~/Library/Logs/Phang/phang-gui.log.",
+            fg=RED,
+        )
+        self._run_btn.config(state="normal", text="▶  Run Pipeline")
+        self._reset_progress_for_pipeline()
 
     # ── Utility ──────────────────────────────────────────────────────────────
 
