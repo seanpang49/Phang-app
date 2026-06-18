@@ -662,12 +662,22 @@ class PhangApp(tk.Tk):
 
 def launch() -> None:
     """Launch the Phang GUI. Entry point for `phang gui`."""
+    # Decide whether drag-and-drop is actually usable *before* building the app.
+    # tkinterdnd2 can import cleanly yet still fail to load its native tkdnd
+    # library at TkinterDnD.Tk() construction — e.g. its bundled Apple-Silicon
+    # build is libtcl9tkdnd2 (Tcl 9) while the packaged interpreter is Tcl/Tk
+    # 8.6, which raises TclError "incompatible stubs mechanism". Probe on a
+    # throwaway root so we fall back cleanly to plain tk.Tk (click-to-browse)
+    # instead of crashing on launch.
+    dnd_ok = False
     try:
-        # Use TkinterDnD root if available (enables drag-and-drop)
         from tkinterdnd2 import TkinterDnD
-        PhangApp.__bases__ = (TkinterDnD.Tk,)
-    except Exception:
-        pass  # Falls back to plain tk.Tk — click-only file selection
+        _probe = TkinterDnD.Tk()
+        _probe.destroy()
+        dnd_ok = True
+    except Exception as e:
+        logger.warning("Drag-and-drop unavailable (%s); using click-to-browse.", e)
 
+    PhangApp.__bases__ = (TkinterDnD.Tk,) if dnd_ok else (tk.Tk,)
     app = PhangApp()
     app.mainloop()
