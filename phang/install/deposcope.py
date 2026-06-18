@@ -18,9 +18,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable
 
-from phang.config import DB_DIR, DB_MANIFEST_FILENAME, ENV_DEPOSCOPE, PHANG_HOME, PYTHON_VERSIONS
+from phang.config import (
+    DB_DIR,
+    DB_MANIFEST_FILENAME,
+    ENV_DEPOSCOPE,
+    ENV_PHANOTATE,
+    PHANG_HOME,
+    PYTHON_VERSIONS,
+)
 from phang.install.common import (
     _run_conda,
+    conda_install,
     create_env,
     download_file,
     env_exists,
@@ -186,16 +194,85 @@ def _ensure_model() -> None:
     )
 
 
+def _phanotate_works(conda: str) -> bool:
+    """True if phanotate's C-extensions import in the dedicated env (right arch)."""
+    try:
+        cp = subprocess.run(
+            make_conda_cmd(conda, [
+                "run", "--no-capture-output", "-p", str(ENV_PHANOTATE),
+                "python", "-c", "import fastpathz, fastpath",
+            ]),
+            text=True, capture_output=True,
+        )
+        return cp.returncode == 0
+    except Exception:
+        return False
+
+
+def _ensure_phanotate_env(conda: str) -> None:
+    """
+    Create a dedicated phanotate env (bioconda, native arch).
+
+    DepoScope's vendored predict script shells out to ``phanotate.py``. The only
+    native-arm64 phanotate build is bioconda's py3.9 package, which is
+    incompatible with the py3.10 deposcope env, so phanotate gets its own env and
+    is placed on PATH at run time (see steps/s08_deposcope.py).
+    """
+    if env_exists(ENV_PHANOTATE) and _phanotate_works(conda):
+        logger.info("phanotate env already present: %s", ENV_PHANOTATE)
+        return
+    if not env_exists(ENV_PHANOTATE):
+        create_env(conda, ENV_PHANOTATE, PYTHON_VERSIONS["phanotate"])
+    conda_install(conda, ENV_PHANOTATE, ["phanotate"])
+
+
+def _purge_broken_phanotate(conda: str) -> None:
+    """
+    Remove any phanotate pip-installed into the deposcope env.
+
+    Older installs pip-installed phanotate (plus its fastpathz/fastpath
+    C-extensions) directly into the deposcope env; on Apple Silicon those wheels
+    are x86_64 and fail to import, so phanotate.py exits 1 with empty output. We
+    now use the dedicated arm64 phanotate env (placed on PATH at run time), but
+    ``conda run -p deposcope`` resolves the deposcope env's bin first — so a
+    phanotate.py left there would shadow the good one. Remove it. No-op if absent.
+
+    Detection is by the bin script, not an import check: phanotate's import
+    package is ``phanotate_modules`` (not ``phanotate``), so importlib would miss it.
+    """
+    script = ENV_DEPOSCOPE / "bin" / "phanotate.py"
+    if not script.exists():
+        return
+    logger.info("Removing x86_64 phanotate from the deposcope env (using the dedicated env now).")
+    subprocess.run(
+        make_conda_cmd(conda, [
+            "run", "--no-capture-output", "-p", str(ENV_DEPOSCOPE),
+            "pip", "uninstall", "-y", "phanotate", "fastpathz", "fastpath",
+        ]),
+        text=True, capture_output=True,
+    )
+    # Belt-and-suspenders: drop any console scripts pip left behind.
+    for leftover in ("phanotate.py", "phanotate"):
+        try:
+            (ENV_DEPOSCOPE / "bin" / leftover).unlink()
+        except FileNotFoundError:
+            pass
+
+
 def ensure_deposcope() -> str:
     """Ensure DepoScope env is ready. Returns status string."""
     conda = find_conda()
 
     _torch_args = get_torch_pip_args()
+    # NOTE: phanotate is intentionally NOT installed here — its fastpathz/fastpath
+    # C-extensions have no arm64 wheel, so a pip install yields x86_64 binaries
+    # that fail to import on Apple Silicon. phanotate lives in its own env
+    # (_ensure_phanotate_env) and is put on PATH at run time instead.
     _pip_packages = [
         *_torch_args,
         "fair-esm", "biopython",
         "transformers", "tqdm", "pandas", "scikit-learn",
-        "setuptools<72", "protobuf", "sentencepiece", "phanotate",
+        "setuptools<72", "protobuf", "sentencepiece",
     ]
 
     if not env_exists(ENV_DEPOSCOPE):
@@ -222,6 +299,8 @@ def ensure_deposcope() -> str:
                 "pip", "install", *_pip_packages,
             ]))
 
+    _ensure_phanotate_env(conda)
+    _purge_broken_phanotate(conda)
     _ensure_repo()
     _ensure_model()
 

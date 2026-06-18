@@ -18,13 +18,14 @@ from __future__ import annotations
 import ast
 import logging
 import csv
+import os
 import shutil
 import tempfile
 from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-from phang.config import ENV_DEPOSCOPE, PHANG_HOME
+from phang.config import ENV_DEPOSCOPE, ENV_PHANOTATE, PHANG_HOME
 from phang.install.common import find_conda
 from phang.install.deposcope import get_deposcope_model_paths
 from phang.utils.process import run_streaming
@@ -94,7 +95,15 @@ def _run_single(
 
     # DepoScope does not accept a --device flag; it auto-detects GPU
 
-    rc = run_streaming(cmd, log_path=log_path)
+    # Put the dedicated phanotate env on PATH so the vendored predict script's
+    # `subprocess.run(["phanotate.py", ...])` resolves a working (native-arch)
+    # phanotate. The deposcope env deliberately ships none, so this is what it
+    # finds. `conda run` prepends the deposcope env bin, but phanotate isn't
+    # there, so resolution falls through to this entry.
+    run_env = os.environ.copy()
+    run_env["PATH"] = str(ENV_PHANOTATE / "bin") + os.pathsep + run_env.get("PATH", "")
+
+    rc = run_streaming(cmd, log_path=log_path, env=run_env)
     return rc == 0
 
 

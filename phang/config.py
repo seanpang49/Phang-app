@@ -26,6 +26,10 @@ ENV_DEFENSEFINDER = ENVS_DIR / "defensefinder"
 ENV_VCONTACT3 = ENVS_DIR / "vcontact3"
 ENV_RBPDETECT = ENVS_DIR / "rbpdetect"
 ENV_DEPOSCOPE = ENVS_DIR / "deposcope"
+# Dedicated env for phanotate (DepoScope shells out to phanotate.py). Kept
+# separate because the only arm64 phanotate build is on bioconda for py3.9,
+# while the deposcope env is py3.10 for the ESM-2 stack.
+ENV_PHANOTATE = ENVS_DIR / "phanotate"
 
 # --- Database paths ---
 DB_PHAROKKA = DB_DIR / "pharokka_db"
@@ -48,6 +52,7 @@ PYTHON_VERSIONS = {
     "vcontact3": "3.10",
     "rbpdetect": "3.10",
     "deposcope": "3.10",
+    "phanotate": "3.9",
 }
 
 # --- FASTA extensions recognised by the pipeline ---
