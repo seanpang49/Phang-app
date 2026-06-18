@@ -118,8 +118,9 @@ def run_pipeline(
 
     # --- Pre-flight: install / verify all tools ---
     logger.info("Checking tool installations…")
-    from phang.install.manager import ensure_all
-    tool_status = ensure_all()
+    from phang.install.manager import ensure_all_detailed
+    tool_status_detailed = ensure_all_detailed()
+    tool_status = {name: st.legacy for name, st in tool_status_detailed.items()}
 
     fasta_files = _collect_fasta_inputs(input_path, output_path)
 
@@ -132,6 +133,7 @@ def run_pipeline(
         "gpu": gpu,
         "force": force,
         "tool_status": tool_status,
+        "tool_status_detailed": tool_status_detailed,
         "results": {},   # keyed by phage stem → per-phage output dict
     }
 

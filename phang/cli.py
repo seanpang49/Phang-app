@@ -40,6 +40,18 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Install all tools and databases (~/.phang/). Safe to re-run — skips already-installed components.",
     )
 
+    # ---- bootstrap subcommand (first-run orchestrator for installers) ----
+    bootstrap_parser = subparsers.add_parser(
+        "bootstrap",
+        help="First-run setup: verify conda, install all tools + databases, and "
+             "record a manifest. Safe to re-run. Used by the installers.",
+    )
+    bootstrap_parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Re-run even if a previous bootstrap manifest is present.",
+    )
+
     # ---- setup subcommand (creates desktop shortcut) ----
     subparsers.add_parser(
         "setup",
@@ -227,6 +239,24 @@ def main() -> None:
                 print(f"  {tool}: {msg}")
         else:
             print("\nAll tools installed successfully.")
+        return
+
+    if args.command == "bootstrap":
+        logging.basicConfig(
+            level=logging.INFO,
+            format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            datefmt="%H:%M:%S",
+        )
+        from phang.install.bootstrap import bootstrap
+        manifest = bootstrap(force=args.force)
+        tools = manifest.get("tools", {})
+        failed = {k: v for k, v in tools.items() if v.get("state") == "failed"}
+        if failed:
+            print("\nSome non-fatal tools failed:")
+            for tool, info in failed.items():
+                print(f"  {tool}: {info.get('message', '')}")
+        else:
+            print("\nphang bootstrap complete — all tools ready.")
         return
 
     if args.command == "gui":
