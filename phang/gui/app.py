@@ -69,6 +69,12 @@ class PhangApp(tk.Tk):
     ]
     TOTAL_STEPS = len(STEPS)
 
+    # Single-frame spinner cycled by the queue pollers to show the window is
+    # alive during long silent stretches (a slow per-tool install or a multi-GB
+    # database download can log nothing for minutes). ASCII so it renders in any
+    # Tk font shipped with the packaged interpreter.
+    _SPINNER = "|/-\\"
+
     _ICON_PATH = Path(__file__).parent / "assets" / "icon.png"
 
     def __init__(self):
@@ -87,6 +93,11 @@ class PhangApp(tk.Tk):
         self._queue: queue.Queue = queue.Queue()
         self._current_step = 0
         self._result_paths: List[Path] = []
+        # Latest status text each poller renders (with a spinner) so the window
+        # keeps repainting even while the worker thread is silent under load.
+        self._setup_status_base = ""
+        self._run_status_base = ""
+        self._spin = 0
 
         self._build_ui()
         self._center_window()
@@ -378,7 +389,8 @@ class PhangApp(tk.Tk):
         self._open_btn.pack_forget()
         self._status_label.config(text="")
         self._progress["value"] = 0
-        self._step_label.config(text=f"Step 0/{self.TOTAL_STEPS} — Starting…", fg=TEXT_MUTED)
+        self._run_status_base = f"Step 0/{self.TOTAL_STEPS} — Starting…"
+        self._step_label.config(text=self._run_status_base, fg=TEXT_MUTED)
 
         # Setup queue logging
         q = self._queue
@@ -443,25 +455,52 @@ class PhangApp(tk.Tk):
         except Exception as exc:
             q.put(("error", str(exc)))
 
+    def _flush(self) -> None:
+        """Force pending widget repaints to the screen now. Used after terminal
+        state changes so the final frame (e.g. "Setup complete") always paints,
+        even when the main thread was being starved of redraw cycles."""
+        try:
+            self.update_idletasks()
+        except tk.TclError:
+            pass  # window closed
+
+    def _heartbeat(self, base: str) -> None:
+        """Re-render the active status line with a cycling spinner and flush the
+        display. Keeps the window visibly alive and repainting even when the
+        worker thread logs nothing for a while, or heavy (USB) disk I/O starves
+        Tk's redraw cycle — the root cause of the first-run "frozen on a stale
+        frame" symptom."""
+        self._spin = (self._spin + 1) % len(self._SPINNER)
+        if base:
+            self._step_label.config(text=f"{self._SPINNER[self._spin]}  {base}")
+        try:
+            self.update_idletasks()
+        except tk.TclError:
+            pass  # window closed
+
     def _poll_queue(self) -> None:
         """Called by tkinter every 100ms to process messages from the pipeline thread."""
         try:
             while True:
                 msg_type, data = self._queue.get_nowait()
-
-                if msg_type == "log":
-                    self._handle_log(data)
-                elif msg_type == "done":
-                    self._on_done(data)
-                    return
-                elif msg_type == "error":
-                    self._on_error(data)
-                    return
-
+                try:
+                    if msg_type == "log":
+                        self._handle_log(data)
+                    elif msg_type == "done":
+                        self._on_done(data)
+                        return
+                    elif msg_type == "error":
+                        self._on_error(data)
+                        return
+                except Exception:
+                    # A single malformed message must never kill the poll loop —
+                    # that would freeze the UI mid-run with no recovery.
+                    logger.exception("error handling pipeline message %r", msg_type)
         except queue.Empty:
             pass
 
         if self._running:
+            self._heartbeat(self._run_status_base)
             self.after(100, self._poll_queue)
 
     def _handle_log(self, message: str) -> None:
@@ -488,10 +527,10 @@ class PhangApp(tk.Tk):
             if key in lower and step > self._current_step:
                 self._current_step = step
                 label = self.STEPS[step] if step < len(self.STEPS) else "Finishing…"
-                self._step_label.config(
-                    text=f"Step {step}/{self.TOTAL_STEPS} — {label}",
-                    fg=TEXT,
-                )
+                # Store the base text; the heartbeat renders it (with a spinner)
+                # and forces the repaint on the next poll tick.
+                self._run_status_base = f"Step {step}/{self.TOTAL_STEPS} — {label}"
+                self._step_label.config(fg=TEXT)
                 self._progress["value"] = step
                 pct = int(step / self.TOTAL_STEPS * 100)
                 self._pct_label.config(text=f"{pct}%")
@@ -509,12 +548,14 @@ class PhangApp(tk.Tk):
             fg=TEXT_MUTED,
         )
         self._open_btn.pack(fill="x", pady=(8, 0))
+        self._flush()
 
     def _on_error(self, error: str) -> None:
         self._running = False
         self._run_btn.config(state="normal", text="▶  Run Pipeline")
         self._step_label.config(text="❌  Pipeline failed.", fg=RED)
         self._status_label.config(text=f"Error: {error}", fg=RED)
+        self._flush()
 
     def _on_open_results(self) -> None:
         for path in self._result_paths:
@@ -553,7 +594,8 @@ class PhangApp(tk.Tk):
                  "it resumes next time (finished downloads are kept).",
             fg=AMBER,
         )
-        self._step_label.config(text="Preparing setup…", fg=TEXT_MUTED)
+        self._setup_status_base = "Preparing setup…"
+        self._step_label.config(text=self._setup_status_base, fg=TEXT_MUTED)
         self._progress.config(mode="determinate", maximum=len(self._SETUP_TOOLS))
         self._progress["value"] = 0
         self._pct_label.config(text="0%")
@@ -585,23 +627,32 @@ class PhangApp(tk.Tk):
         try:
             while True:
                 msg_type, data = self._queue.get_nowait()
-                if msg_type == "log":
-                    self._handle_setup_log(data)
-                elif msg_type == "setup_done":
-                    self._on_setup_done()
-                    return
-                elif msg_type == "setup_error":
-                    self._on_setup_error(data)
-                    return
+                try:
+                    if msg_type == "log":
+                        self._handle_setup_log(data)
+                    elif msg_type == "setup_done":
+                        self._on_setup_done()
+                        return
+                    elif msg_type == "setup_error":
+                        self._on_setup_error(data)
+                        return
+                except Exception:
+                    # One malformed log line must never kill the poll loop and
+                    # leave setup looking frozen with no path to "complete".
+                    logger.exception("error handling setup message %r", msg_type)
         except queue.Empty:
             pass
         if self._setup_running:
+            self._heartbeat(self._setup_status_base)
             self.after(100, self._poll_setup_queue)
 
     def _handle_setup_log(self, message: str) -> None:
         text = message.strip()
         if text:
-            self._step_label.config(text=text[:80], fg=TEXT_MUTED)
+            # Store only; the heartbeat renders it (with a spinner) once per poll
+            # tick rather than once per log line — far fewer Tcl calls under the
+            # conda install's heavy log volume, and it forces a repaint.
+            self._setup_status_base = text[:80]
         # The install manager logs "Checking tool: <name>" as each tool begins.
         low = message.lower()
         if "checking tool:" in low:
@@ -635,6 +686,7 @@ class PhangApp(tk.Tk):
         self._status_label.config(text="", fg=TEXT)
         self._run_btn.config(state="normal", text="▶  Run Pipeline")
         self._reset_progress_for_pipeline()
+        self._flush()
 
     def _on_setup_error(self, error: str) -> None:
         self._setup_running = False
@@ -648,6 +700,7 @@ class PhangApp(tk.Tk):
         )
         self._run_btn.config(state="normal", text="▶  Run Pipeline")
         self._reset_progress_for_pipeline()
+        self._flush()
 
     # ── Utility ──────────────────────────────────────────────────────────────
 
@@ -673,10 +726,22 @@ def launch() -> None:
     try:
         from tkinterdnd2 import TkinterDnD
         _probe = TkinterDnD.Tk()
+        _probe.withdraw()        # never flash the throwaway probe window
         _probe.destroy()
         dnd_ok = True
     except Exception as e:
         logger.warning("Drag-and-drop unavailable (%s); using click-to-browse.", e)
+        # TkinterDnD.Tk() builds the underlying Tk root *before* it loads the
+        # native tkdnd library, so a load failure escapes with the root already
+        # created — an orphaned empty "tk" window that also became the default
+        # root. Tear it down so only the real app window remains.
+        orphan = getattr(tk, "_default_root", None)
+        if orphan is not None:
+            try:
+                orphan.destroy()
+            except Exception:
+                pass
+            tk._default_root = None
 
     PhangApp.__bases__ = (TkinterDnD.Tk,) if dnd_ok else (tk.Tk,)
     app = PhangApp()
