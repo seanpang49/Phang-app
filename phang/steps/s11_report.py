@@ -68,7 +68,7 @@ def run_report(ctx: Dict[str, Any]) -> Dict[str, Any]:
 
         logger.info("  Report card ← %s", stem)
         try:
-            data = build_report_data(stem, per, ncbi_ctx)
+            data = build_report_data(stem, per, ncbi_ctx, ctx.get("tool_status"))
             _attach_download_hrefs(data, out_html.parent)
             html = render_report(data)
             out_html.parent.mkdir(parents=True, exist_ok=True)
