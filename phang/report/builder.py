@@ -24,6 +24,78 @@ _VC3_CLOSEST_CACHE_VERSION = 2
 
 
 # ---------------------------------------------------------------------------
+# Per-tool run status (drives the report's "tool did not run" banners)
+# ---------------------------------------------------------------------------
+#
+# An empty report section is ambiguous: the tool may have run and found
+# nothing, or it may have failed / never run. To disambiguate we record, per
+# genome, whether each analysis tool actually produced output. A tool "ran"
+# for this genome if at least one of its expected output files exists.
+
+# report-key -> the per-phage `per` keys whose presence proves the tool ran
+_REPORT_TOOL_OUTPUTS: Dict[str, tuple] = {
+    "defensefinder": ("defensefinder_systems", "defensefinder_genes", "defensefinder_hmmer"),
+    "vcontact3":     ("vcontact3_overview",),
+    "phabox2":       ("cherry_host_prediction",),
+    "phastyle":      ("phastyle_predictions",),
+    "rbpdetect":     ("rbp_predictions",),
+    "deposcope":     ("deposcope_results",),
+}
+
+# report-key -> human label shown in the banner
+_REPORT_TOOL_LABELS: Dict[str, str] = {
+    "defensefinder": "DefenseFinder",
+    "vcontact3":     "vConTACT3",
+    "phabox2":       "PhaBOX2",
+    "phastyle":      "PhaStyle",
+    "rbpdetect":     "PhageRBPdetect",
+    "deposcope":     "DepoScope",
+}
+
+
+def _path_exists(path: Any) -> bool:
+    """True if *path* is set and points at an existing file/dir."""
+    if not path:
+        return False
+    try:
+        return Path(path).exists()
+    except (TypeError, ValueError):
+        return False
+
+
+def _compute_tool_status(
+    per: Dict[str, Any],
+    install_status: Optional[Dict[str, str]],
+) -> Dict[str, Dict[str, Any]]:
+    """
+    Decide, per analysis tool, whether it ran for this genome.
+
+    *install_status* is the optional ``{tool: legacy_status_string}`` map from
+    ``ensure_all()`` (None when reports are rebuilt offline). A tool's section
+    is flagged only when the tool produced no output for this genome; if the
+    install itself failed the banner says so explicitly.
+    """
+    install = install_status or {}
+    status: Dict[str, Dict[str, Any]] = {}
+    for key, out_keys in _REPORT_TOOL_OUTPUTS.items():
+        ran = any(_path_exists(per.get(k)) for k in out_keys)
+        legacy = install.get(key)
+        install_failed = isinstance(legacy, str) and legacy.startswith("FAILED:")
+        if ran:
+            reason = ""
+        elif install_failed:
+            reason = "failed to install"
+        else:
+            reason = "did not run"
+        status[key] = {
+            "ran": ran,
+            "label": _REPORT_TOOL_LABELS[key],
+            "reason": reason,
+        }
+    return status
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -1245,13 +1317,22 @@ def _parse_deposcope(depo_results: Optional[Path], depo_tokens: Optional[Path]) 
 # Main builder
 # ---------------------------------------------------------------------------
 
-def build_report_data(stem: str, per: Dict[str, Any], ncbi_ctx: Dict[str, Any]) -> Dict[str, Any]:
+def build_report_data(
+    stem: str,
+    per: Dict[str, Any],
+    ncbi_ctx: Dict[str, Any],
+    tool_status: Optional[Dict[str, str]] = None,
+) -> Dict[str, Any]:
     """
     Build the full data dict for one phage report card.
 
-    *stem*    : phage name (folder stem)
-    *per*     : ctx['results'][stem]
-    *ncbi_ctx*: top-level ctx keys (ncbi_multifasta, ncbi_features_tbl, etc.)
+    *stem*        : phage name (folder stem)
+    *per*         : ctx['results'][stem]
+    *ncbi_ctx*    : top-level ctx keys (ncbi_multifasta, ncbi_features_tbl, etc.)
+    *tool_status* : optional ``{tool: legacy_status}`` install map from
+                    ``ensure_all()``; lets the report flag a tool that failed to
+                    install vs one that simply produced no hits. ``None`` when a
+                    report is rebuilt offline (status inferred from outputs).
     """
     best_gbk: Optional[Path] = (
         per.get("phynteny_gbk")
@@ -1322,6 +1403,7 @@ def build_report_data(stem: str, per: Dict[str, Any], ncbi_ctx: Dict[str, Any]) 
 
     return {
         "name":           stem,
+        "tool_status":    _compute_tool_status(per, tool_status),
         "genome":         genome_stats,
         "genome_map":     genome_map,
         "phrog_cats":     phrog_cats,

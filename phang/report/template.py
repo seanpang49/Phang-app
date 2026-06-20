@@ -455,6 +455,32 @@ def _na(msg: str = "No data available") -> str:
     return f'<span class="na">{msg}</span>'
 
 
+def _tool_banner(d: Dict[str, Any], tool_key: str) -> str:
+    """
+    Warning banner for a tool that did not run for this genome.
+
+    Returns '' when the tool ran (or its status is unknown), so a section can
+    do ``_tool_banner(d, key) or <normal empty state>`` and surface the banner
+    only when the tool genuinely failed / never ran — never when it ran and
+    simply found nothing.
+    """
+    info = (d.get("tool_status") or {}).get(tool_key)
+    if not info or info.get("ran", True):
+        return ""
+    label = info.get("label", tool_key)
+    reason = info.get("reason") or "did not run"
+    return (
+        '<div style="display:flex;gap:10px;align-items:flex-start;'
+        'padding:11px 14px;background:#451a03;border:1px solid #92400e;'
+        'border-radius:8px;color:#fbbf24;font-size:13px;line-height:1.5">'
+        '<span style="font-size:15px;line-height:1.3">⚠️</span>'
+        f'<span><strong>{label} {reason}</strong> — results unavailable for this '
+        'genome. An empty section here means the tool produced no output, not '
+        'that nothing was found.</span>'
+        '</div>'
+    )
+
+
 def _organism_label_from_hosts(hosts: list[Dict[str, Any]]) -> str:
     for row in hosts or []:
         host = (row.get("host") or "").strip()
@@ -661,7 +687,7 @@ def render_report(d: Dict[str, Any]) -> str:
     organism_label = _organism_label_from_hosts(d.get("hosts", []))
     host_badges = " ".join(
         _badge(h["host"], "info") for h in d["hosts"]
-    ) or _na("No host prediction data")
+    ) or _tool_banner(d, "phabox2") or _na("No host prediction data")
 
     tax = d["taxonomy"]
     tax_html = ""
@@ -742,7 +768,7 @@ def render_report(d: Dict[str, Any]) -> str:
 
   <div class="card col-1-3">
     <div class="section-title">🧬 Taxonomy</div>
-    {tax_html if tax_html else _na("Run vConTACT3 for taxonomy")}
+    {tax_html if tax_html else (_tool_banner(d, "vcontact3") or _na("Run vConTACT3 for taxonomy"))}
   </div>
 
   <div class="card col-3-5">
@@ -879,6 +905,7 @@ def render_report(d: Dict[str, Any]) -> str:
   </div>
   <div class="card">
     <div class="section-title">🔄 Lifestyle Prediction</div>
+    {_tool_banner(d, "phastyle")}
     <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px">
       <div class="lifestyle-ring" style="background:{conic}">
         <div class="lifestyle-inner">{conf_pct}%</div>
@@ -894,9 +921,9 @@ def render_report(d: Dict[str, Any]) -> str:
     # ------------------------------------------------------------------ #
     # Defence tab
     # ------------------------------------------------------------------ #
-    def _defence_table(rows: list, headers: list, row_fn) -> str:
+    def _defence_table(rows: list, headers: list, row_fn, empty: str = "") -> str:
         if not rows:
-            return _na("None detected")
+            return empty or _na("None detected")
         header_html = "".join(f"<th>{h}</th>" for h in headers)
         body_html = "".join(
             f"<tr>{''.join(f'<td>{c}</td>' for c in row_fn(r))}</tr>"
@@ -943,7 +970,8 @@ def render_report(d: Dict[str, Any]) -> str:
   {_defence_table(
       d["defence"]["defence_finder"],
       ["Type", "Subtype", "Activity", "Proteins", "Gene Count", "Source"],
-      _defense_system_row
+      _defense_system_row,
+      empty=_tool_banner(d, "defensefinder"),
   )}
 </div>
 <div class="card">
@@ -951,7 +979,8 @@ def render_report(d: Dict[str, Any]) -> str:
   {_defence_table(
       d["defence"]["defence_finder_genes"],
       ["Protein", "Gene", "Type", "Subtype", "E-value", "Source"],
-      _defense_gene_row
+      _defense_gene_row,
+      empty=_tool_banner(d, "defensefinder"),
   )}
 </div>
 <div class="card">
@@ -979,11 +1008,13 @@ def render_report(d: Dict[str, Any]) -> str:
     tailfibers_tab = f"""
 <div class="card">
   <div class="section-title">🔍 PhageRBPdetect — Receptor-Binding Proteins</div>
-  {_defence_table(rbp_rows, ["Protein", "Length", "RBP Score", "Class"], _rbp_row)}
+  {_defence_table(rbp_rows, ["Protein", "Length", "RBP Score", "Class"], _rbp_row,
+                  empty=_tool_banner(d, "rbpdetect"))}
 </div>
 <div class="card">
   <div class="section-title">🧬 DepoScope — Depolymerase Predictions</div>
-  {_defence_table(depo_rows, ["Protein", "Dep Score", "Is Depolymerase", "Domain Type", "Domain Region"], _depo_row)}
+  {_defence_table(depo_rows, ["Protein", "Dep Score", "Is Depolymerase", "Domain Type", "Domain Region"], _depo_row,
+                  empty=_tool_banner(d, "deposcope"))}
 </div>"""
 
     # ------------------------------------------------------------------ #
