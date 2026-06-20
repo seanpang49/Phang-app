@@ -94,12 +94,27 @@ def get_torch_pip_args(prefer_cuda: bool = True) -> List[str]:
 
 
 def env_exists(env_path: Path) -> bool:
-    """Return True if a conda prefix looks valid (has conda-meta directory)."""
-    return (env_path / "conda-meta").exists()
+    """Return True only if a COMPLETE conda env exists.
+
+    Checks for ``conda-meta/history`` (the marker conda itself uses) rather than
+    just the ``conda-meta`` directory. An interrupted ``conda create`` leaves a
+    partial prefix with ``conda-meta/`` but no ``history``, which conda rejects as
+    "not a conda environment". Treating that as absent lets create_env recreate it
+    instead of every subsequent ``conda run`` failing against the broken prefix.
+    """
+    return (env_path / "conda-meta" / "history").exists()
 
 
 def create_env(conda: str, env_path: Path, python_version: str) -> None:
-    """Create a new conda env at *env_path* with the given Python version."""
+    """Create a new conda env at *env_path* with the given Python version.
+
+    If the directory already exists but is not a valid conda env (e.g. a prior
+    ``conda create`` was interrupted, leaving a partial prefix), remove it first
+    so ``conda create`` doesn't fail with "prefix already exists".
+    """
+    if env_path.exists() and not env_exists(env_path):
+        logger.warning("Removing partial/invalid env prefix before recreating: %s", env_path)
+        shutil.rmtree(env_path, ignore_errors=True)
     env_path.parent.mkdir(parents=True, exist_ok=True)
     logger.info("Creating conda env: %s (Python %s)", env_path, python_version)
     _run_conda(make_conda_cmd(conda, [
