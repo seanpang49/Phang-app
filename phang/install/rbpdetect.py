@@ -77,7 +77,6 @@ def _find_cached_model_dir() -> Path | None:
         direct_candidates = [
             root / "rbpdetect_model" / "RBPdetect_v4_ESMfine",
             root / "databases" / "rbpdetect_model" / "RBPdetect_v4_ESMfine",
-            root / "seanpang__.phang" / "databases" / "rbpdetect_model" / "RBPdetect_v4_ESMfine",
         ]
         recursive_patterns = [
             "*/databases/rbpdetect_model/RBPdetect_v4_ESMfine",
