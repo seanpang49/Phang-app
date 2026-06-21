@@ -93,7 +93,6 @@ def _find_cached_model_root() -> Path | None:
         direct_candidates = [
             root / "deposcope_model",
             root / "databases" / "deposcope_model",
-            root / "seanpang__.phang" / "databases" / "deposcope_model",
         ]
         recursive_patterns = [
             "*/databases/deposcope_model",
