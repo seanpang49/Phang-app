@@ -10,10 +10,14 @@ The simplest way to run Phang — no terminal, no conda setup. Download the inst
 
 ### macOS (Apple Silicon)
 
-1. Download `Phang-<version>-osx-arm64.pkg` and double-click it to install.
-2. Open **Phang** from your Applications folder. This beta is **unsigned**, so the first time you open it macOS will warn that it "cannot be opened because Apple cannot check it for malicious software." **Right-click (Control-click) the Phang app → Open**, then click **Open** in the dialog. You only do this once. _(Alternatively: System Settings → Privacy & Security → "Open Anyway".)_
-3. On first launch, Phang downloads its analysis tools and reference databases (~30 GB) into `~/.phang`. A progress window shows the status — keep it open. You can quit to pause; it resumes next time and finished downloads are kept.
-4. When setup finishes, drag a folder of FASTA files onto the window and click **Run Pipeline**.
+1. **Download `Phang-<version>-MacOSX-arm64.pkg`** from the [latest release](../../releases/latest) and double-click it.
+2. This beta is **unsigned**, so macOS Gatekeeper blocks it the first time. How you allow it depends on your macOS version:
+   - **macOS 15 (Sequoia) or later:** when you see *"cannot be opened because Apple cannot check it for malicious software"*, click **Done**, then open **System Settings → Privacy & Security**, scroll to the **Security** section, and click **Open Anyway**. (Control-click → Open no longer bypasses Gatekeeper on Sequoia.)
+   - **macOS 11–14:** **right-click (Control-click)** the file in Finder → **Open** → **Open**.
+3. Click through the installer (**Continue → Install**; it asks for your Mac password). Phang installs to **/Applications**.
+4. Open **Phang** from Applications or Launchpad. The app bundle is also unsigned, so apply the **same Gatekeeper step as above** the first time you open it (you only do this once).
+5. On first launch, Phang downloads its analysis tools and reference databases (~30 GB) into `~/.phang`. A progress window shows the status — keep it open. You can quit to pause; it resumes next time and finished downloads are kept.
+6. When setup finishes, click **Choose folder…**, pick a folder of FASTA files, choose an output folder, and click **Run Pipeline**.
 
 > Requires an Apple Silicon Mac (M1 or later), macOS 11+, ~35 GB free disk space, and an internet connection for the one-time first-run setup. Runs natively on Apple Silicon (no Rosetta).
 
