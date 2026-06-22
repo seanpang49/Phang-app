@@ -61,6 +61,7 @@ mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cat > "$APP/Contents/MacOS/Phang" <<LAUNCHER
 #!/bin/bash
 export PATH="$PREFIX/bin:\$PATH"
+export MPLBACKEND=Agg
 mkdir -p "\$HOME/Library/Logs/Phang"
 exec "$PREFIX/bin/phang" gui >> "\$HOME/Library/Logs/Phang/phang-gui.log" 2>&1
 LAUNCHER
@@ -74,8 +75,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleName</key><string>Phang</string>
   <key>CFBundleDisplayName</key><string>Phang</string>
   <key>CFBundleIdentifier</key><string>org.phang.gui</string>
-  <key>CFBundleVersion</key><string>0.2.2</string>
-  <key>CFBundleShortVersionString</key><string>0.2.2</string>
+  <key>CFBundleVersion</key><string>0.2.3</string>
+  <key>CFBundleShortVersionString</key><string>0.2.3</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>Phang</string>
   <key>CFBundleIconFile</key><string>Phang</string>
