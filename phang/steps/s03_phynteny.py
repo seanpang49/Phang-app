@@ -76,11 +76,16 @@ def _run_single(
         "-f",
     ]
 
-    # cwd=outdir: phynteny writes intermediate files (e.g. skipped_genomes.txt)
-    # to the *current working directory* via a relative path. When Phang runs as
-    # a double-clicked .app the CWD is "/" (read-only) → OSError Errno 30. Point
-    # the child at the writable per-phage output dir instead (HANDOFF BUG #1).
-    rc = run_streaming(cmd, log_path=log_path, cwd=outdir)
+    # phynteny writes intermediate files (e.g. skipped_genomes.txt) to its
+    # current working directory via a relative path, so the CWD must be writable
+    # (a double-clicked .app starts in "/", which is read-only → Errno 30).
+    # It must NOT be `outdir`: phynteny runs with -f and rmtree()s its own -o dir
+    # at startup (format_data.instantiate_dir), which would delete the CWD out
+    # from under it (→ Errno 2). Use a dedicated per-phage scratch dir that no
+    # tool owns or wipes. (HANDOFF BUG #1)
+    work_dir = outdir.parent / "_scratch"
+    work_dir.mkdir(parents=True, exist_ok=True)
+    rc = run_streaming(cmd, log_path=log_path, cwd=work_dir)
     return rc == 0
 
 
