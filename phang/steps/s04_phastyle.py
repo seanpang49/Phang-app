@@ -58,7 +58,11 @@ def _run_single(
         "--batch-size", str(_BATCH_SIZE),
     ]
 
-    rc = run_streaming(cmd, log_path=log_path)
+    # cwd=outdir: PhaStyle writes ./prokbert_inference_output to the current
+    # working directory via a relative path. Under a double-clicked .app the CWD
+    # is "/" (read-only) → OSError Errno 30. Point the child at the writable
+    # per-phage output dir instead (HANDOFF BUG #1).
+    rc = run_streaming(cmd, log_path=log_path, cwd=outdir)
     return rc == 0
 
 
