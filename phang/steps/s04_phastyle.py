@@ -58,11 +58,15 @@ def _run_single(
         "--batch-size", str(_BATCH_SIZE),
     ]
 
-    # cwd=outdir: PhaStyle writes ./prokbert_inference_output to the current
-    # working directory via a relative path. Under a double-clicked .app the CWD
-    # is "/" (read-only) → OSError Errno 30. Point the child at the writable
-    # per-phage output dir instead (HANDOFF BUG #1).
-    rc = run_streaming(cmd, log_path=log_path, cwd=outdir)
+    # PhaStyle writes ./prokbert_inference_output to its current working dir via
+    # a relative path, so the CWD must be writable (a double-clicked .app starts
+    # in "/", read-only → Errno 30). Use a dedicated per-phage scratch dir that
+    # no tool owns or wipes — same convention as phynteny, keeps stray files out
+    # of the results folder and is safe even if a tool wipes its own -o dir.
+    # (HANDOFF BUG #1)
+    work_dir = outdir.parent / "_scratch"
+    work_dir.mkdir(parents=True, exist_ok=True)
+    rc = run_streaming(cmd, log_path=log_path, cwd=work_dir)
     return rc == 0
 
 
