@@ -7,6 +7,15 @@ Or via the desktop shortcut: ~/Desktop/Phang.command
 
 from __future__ import annotations
 
+import os
+
+# Force matplotlib's headless Agg backend process-wide before anything can
+# import matplotlib. The pipeline runs on a worker thread, where matplotlib's
+# default Tk backend crashes/wedges off the main thread and blanks the GUI
+# window (HANDOFF BUG #2). Setting MPLBACKEND before the first matplotlib import
+# makes Agg win regardless of import order.
+os.environ.setdefault("MPLBACKEND", "Agg")
+
 import logging
 import queue
 import subprocess
