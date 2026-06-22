@@ -110,6 +110,13 @@ def _draw_genome_map(
     out_png: Path,
 ) -> None:
     """Render the circular genome map using pyCirclize and save to *out_png*."""
+    # Force the headless Agg backend BEFORE importing pyplot/pyCirclize. The
+    # pipeline can run on a worker thread (GUI), where matplotlib's default Tk
+    # backend tries to spin up a GUI off the main thread and wedges the Phang
+    # window blank (HANDOFF BUG #2). Agg writes straight to PNG with no GUI, so
+    # it is thread-safe. (Belt-and-suspenders to MPLBACKEND=Agg set in the GUI.)
+    import matplotlib
+    matplotlib.use("Agg")
     from pycirclize import Circos
     import matplotlib.pyplot as plt
     import matplotlib.patches as mpatches
