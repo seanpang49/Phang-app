@@ -14,7 +14,7 @@
 # as root inside this installer.
 
 name: Phang
-version: 0.2.4
+version: 0.2.5
 company: Phang
 
 # Apple Silicon only for this beta (see plan: Intel deferred).
@@ -44,7 +44,7 @@ specs:
 
 # Files copied into the install prefix root, consumed by post_install.sh.
 extra_files:
-  - dist/phang-0.2.4-py3-none-any.whl
+  - dist/phang-0.2.5-py3-none-any.whl
   - Phang.icns
 
 installer_type: pkg
