@@ -1383,7 +1383,9 @@ def build_report_data(
 
     # Therapy suitability: lytic + all safety bools pass. Underscore-prefixed
     # keys carry detail lists for the template and are excluded from the gate.
-    is_lytic      = lifestyle["lifestyle"].lower() in ("lytic",)
+    # PhaStyle labels strictly-lytic phages "virulent" (never the literal
+    # "lytic"), so treat "virulent" as lytic; "temperate"/"lysogenic" are not.
+    is_lytic      = lifestyle["lifestyle"].lower() in ("lytic", "virulent")
     safety_bools  = [v for k, v in therapy_safety.items() if not k.startswith("_")]
     therapy_ok    = is_lytic and all(safety_bools)
 

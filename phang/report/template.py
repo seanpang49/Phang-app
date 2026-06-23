@@ -670,7 +670,7 @@ def render_report(d: Dict[str, Any]) -> str:
     # Header badges
     # ------------------------------------------------------------------ #
     ls_label = lifestyle["lifestyle"]
-    ls_badge = _badge(ls_label, "lytic" if ls_label.lower() == "lytic" else "warn")
+    ls_badge = _badge(ls_label, "lytic" if ls_label.lower() in ("lytic", "virulent") else "warn")
     th_badge = _badge(
         "THERAPY CANDIDATE ✓" if therapy["suitable"] else "NOT SUITABLE ✗",
         "pass" if therapy["suitable"] else "fail",
