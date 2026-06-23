@@ -92,6 +92,21 @@ if [ -f "$PREFIX/Phang.icns" ]; then
   rm -f "$PREFIX/Phang.icns"
 fi
 
+# ---------------------------------------------------------------------------
+# 3. Clear the "downloaded from internet" quarantine flag (unsigned-beta fix).
+# ---------------------------------------------------------------------------
+# A downloaded .pkg stamps com.apple.quarantine on its payload. macOS (Sequoia+)
+# then blocks this env's UNSIGNED libraries (e.g. the bundled Abseil/Arrow
+# dylibs) the first time each is loaded, popping a "cannot verify ... malware"
+# dialog mid-run. Since this beta is intentionally unsigned, strip the flag here
+# (post-install runs as root, so it can clear the root-owned env files) — the
+# installing user, and anyone they share the .pkg with, then never sees those
+# prompts. The 9 tool-envs under ~/.phang are conda-fetched at first launch and
+# carry no quarantine, so they are unaffected.
+echo "[phang post-install] clearing com.apple.quarantine on the installed env + app…"
+xattr -dr com.apple.quarantine "$PREFIX" 2>/dev/null || true
+xattr -dr com.apple.quarantine "$APP"    2>/dev/null || true
+
 # Refresh Launch Services / icon caches so the new app appears promptly.
 /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister \
   -f "$APP" >/dev/null 2>&1 || true
