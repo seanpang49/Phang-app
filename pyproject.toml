@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "phang"
-version = "0.2.6"
+version = "0.2.7"
 description = "End-to-end phage genome analysis pipeline (merged: Windows cross-platform + Mac defense/therapy fixes)"
 requires-python = ">=3.10"
 dependencies = [

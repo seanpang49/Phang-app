@@ -75,8 +75,8 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleName</key><string>Phang</string>
   <key>CFBundleDisplayName</key><string>Phang</string>
   <key>CFBundleIdentifier</key><string>org.phang.gui</string>
-  <key>CFBundleVersion</key><string>0.2.6</string>
-  <key>CFBundleShortVersionString</key><string>0.2.6</string>
+  <key>CFBundleVersion</key><string>0.2.7</string>
+  <key>CFBundleShortVersionString</key><string>0.2.7</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleExecutable</key><string>Phang</string>
   <key>CFBundleIconFile</key><string>Phang</string>

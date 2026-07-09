@@ -58,7 +58,9 @@ def _parse_lifestyle_row(row: dict) -> tuple[str, str, Optional[bool]]:
             confidence = f"{float(confidence_str) * 100:.0f}%"
         except ValueError:
             confidence = "—"
-    therapy = lifestyle_lower == "lytic"
+    # v0.2.7: PhaStyle emits "Virulent" (never the literal "lytic") for
+    # strictly-lytic phages, so match both -- mirrors builder.py is_lytic.
+    therapy = lifestyle_lower in ("lytic", "virulent")
     return lifestyle, confidence, therapy if lifestyle != "—" else None
 
 

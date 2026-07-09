@@ -5,7 +5,7 @@ Central configuration: all paths and constants for the phang pipeline.
 import os
 from pathlib import Path
 
-VERSION = "0.2.6"
+VERSION = "0.2.7"
 
 # --- Base directories ---
 # Defaults to ~/.phang, but the PHANG_HOME environment variable takes
