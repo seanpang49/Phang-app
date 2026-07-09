@@ -1064,10 +1064,11 @@ def _parse_therapy_safety(
                             + feat.qualifiers.get("function", [])
                             + feat.qualifiers.get("note", [])
                         ).lower()
+                        # v0.2.8: scan integrase + excisionase only. "recombinase" (T4-type
+                        # UvsX) is lytic-replication machinery, not a lysogeny marker.
                         if (
                             "integrase" in text
                             or "excisionase" in text
-                            or "recombinase" in text
                         ):
                             has_integrase = True
                             break
