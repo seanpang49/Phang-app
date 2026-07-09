@@ -88,6 +88,21 @@ a { color: #60a5fa; text-decoration: none; }
 .check-pass { background: #052e16; border: 1.5px solid #166534; }
 .check-fail { background: #450a0a; border: 1.5px solid #991b1b; }
 
+/* Hover tooltips on therapy-suitability checks (v0.2.7) */
+.tip { position: relative; display: inline-flex; align-items: center; justify-content: center;
+  width: 14px; height: 14px; margin-left: 6px; border: 1px solid #334155; border-radius: 50%;
+  color: #64748b; font-size: 9px; font-weight: 700; font-style: normal; font-family: Georgia, serif;
+  cursor: help; vertical-align: middle; }
+.tip .tip-text { visibility: hidden; opacity: 0; position: absolute; left: 50%; bottom: calc(100% + 8px);
+  transform: translateX(-50%); width: 250px; background: #1e293b; color: #cbd5e1;
+  border: 1px solid #334155; border-radius: 6px; padding: 9px 11px; font-size: 11px; font-weight: 400;
+  line-height: 1.5; text-align: left; letter-spacing: normal; text-transform: none;
+  font-family: 'Segoe UI', system-ui, sans-serif; z-index: 50; box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+  transition: opacity 0.15s ease; pointer-events: none; }
+.tip .tip-text::after { content: ""; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
+  border: 5px solid transparent; border-top-color: #334155; }
+.tip:hover .tip-text { visibility: visible; opacity: 1; }
+
 .mini-table { width: 100%; border-collapse: collapse; font-size: 12px; font-family: monospace; }
 .mini-table th { text-align: left; padding: 6px 10px; color: #64748b; font-weight: 600; border-bottom: 1px solid #1e293b; font-size: 10px; text-transform: uppercase; letter-spacing: 0.08em; }
 .mini-table td { padding: 6px 10px; color: #cbd5e1; border-bottom: 1px solid #0f172a; }
@@ -391,24 +406,32 @@ def _badge(text: str, variant: str = "default") -> str:
     return f'<span class="badge badge-{variant}">{text}</span>'
 
 
-def _check(label: str, passed: bool) -> str:
+def _check(label: str, passed: bool, tooltip: str = "") -> str:
     icon_class = "check-pass" if passed else "check-fail"
     icon = "✓" if passed else "✗"
+    tip = (
+        f'<span class="tip">i<span class="tip-text">{html.escape(tooltip)}</span></span>'
+        if tooltip else ""
+    )
     return (
         f'<div class="check-item">'
         f'<span class="check-icon {icon_class}">{icon}</span>'
-        f'{label}</div>'
+        f'<span>{label}{tip}</span></div>'
     )
 
 
-def _check_with_hits(label: str, passed: bool, hits=None) -> str:
-    """Like ``_check`` but, when failing, lists each detected hit with its
-    gene name, % sequence identity, and detection source (e.g. phold
-    foldseek structural alignment vs. Pharokka MMseqs2). Structural-only
-    hits at low % identity are real signals that should be visible, but a
-    reader needs to see the identity to judge them."""
-    header = _check(label, passed)
-    if passed or not hits:
+def _check_with_hits(label: str, passed: bool, hits=None, tooltip: str = "") -> str:
+    """Like ``_check`` but lists each detected hit with its gene name,
+    % sequence identity, and detection source.
+
+    v0.2.7: the pass/fail verdict is driven by Pharokka (MMseqs2 sequence
+    homology, >=80% id) ONLY. Phold foldseek structural hits never flip the
+    verdict, so they are shown as amber informational "structural homolog"
+    notes (with their low % identity visible) rather than as disqualifying
+    findings; Pharokka hits are shown in red. Hits are therefore listed whether
+    the check passed or failed -- a passing check can still carry Phold notes."""
+    header = _check(label, passed, tooltip)
+    if not hits:
         return header
 
     items = []
@@ -418,6 +441,7 @@ def _check_with_hits(label: str, passed: bool, hits=None) -> str:
         src = html.escape(str(h.get("source") or ""))
         evalue = html.escape(str(h.get("evalue") or ""))
         aln_score = html.escape(str(h.get("aln_score") or ""))
+        is_pharokka = "pharokka" in (h.get("source") or "").lower()
         meta_bits = []
         if pct is not None:
             meta_bits.append(f"<strong>{pct}% identity</strong>")
@@ -433,10 +457,22 @@ def _check_with_hits(label: str, passed: bool, hits=None) -> str:
         if extra:
             meta_bits.append(html.escape(str(extra)))
         meta = " · ".join(meta_bits)
+        if is_pharokka:
+            # Disqualifying sequence-homology hit.
+            name_color = "#fca5a5"
+            note = ""
+        else:
+            # Structural fold-match -- informational only, does not affect the
+            # therapy verdict (see builder._parse_therapy_safety, v0.2.7).
+            name_color = "#fcd34d"
+            note = (
+                ' <span style="color:#fcd34d;font-size:11px">'
+                'ℹ structural homolog — not counted toward suitability</span>'
+            )
         items.append(
             f'<li style="margin:2px 0">'
-            f'<span style="color:#f1f5f9">{name}</span> '
-            f'<span style="color:#94a3b8;font-size:11px">{meta}</span>'
+            f'<span style="color:{name_color}">{name}</span> '
+            f'<span style="color:#94a3b8;font-size:11px">{meta}</span>{note}'
             f'</li>'
         )
     if not items:
@@ -889,6 +925,31 @@ def render_report(d: Dict[str, Any]) -> str:
         else "Integrase / recombinase detected"
     )
 
+    # v0.2.7: hover tooltips explaining how each therapy point is determined.
+    # Wording matches the actual code path: lifestyle = PhaStyle; AMR/VF verdict
+    # = Pharokka sequence homology only (Phold structural hits informational);
+    # lysogeny-gene scan = the Phold annotation, which Phold builds on top of
+    # Pharokka's gene calls.
+    lytic_tip = (
+        "Lifestyle predicted by PhaStyle (ProkBERT). A 'virulent' or 'lytic' "
+        "prediction counts as strictly lytic; 'temperate' does not."
+    )
+    amr_tip = (
+        "Pharokka MMseqs2 search against the CARD database (≥80% identity, "
+        "≥40% coverage). Phold structural (foldseek) matches are shown as "
+        "informational notes only and do not change the verdict."
+    )
+    vf_tip = (
+        "Pharokka MMseqs2 search against the VFDB database (≥80% identity, "
+        "≥40% coverage). Phold structural (foldseek) matches are shown as "
+        "informational notes only and do not change the verdict."
+    )
+    integrase_tip = (
+        "Scan of the Phold annotation (Phold re-annotates Pharokka's gene calls) "
+        "for integrase, excisionase or recombinase — hallmark genes of a "
+        "lysogenic lifecycle."
+    )
+
     therapy_tab = f"""
 <div class="grid-2">
   <div class="card">
@@ -898,10 +959,10 @@ def render_report(d: Dict[str, Any]) -> str:
       <div style="font-size:28px;margin-bottom:4px">{verdict_emoji}</div>
       <div style="font-size:16px;font-weight:600;color:{verdict_color}">{verdict_label}</div>
     </div>
-    {_check("Strictly lytic lifecycle", therapy["strictly_lytic"])}
-    {_check_with_hits(amr_label, therapy["no_amr"], therapy.get("_amr_hits"))}
-    {_check_with_hits(virulence_label, therapy["no_virulence"], therapy.get("_vf_hits"))}
-    {_check(integrase_label, therapy["no_integrase"])}
+    {_check("Strictly lytic lifecycle", therapy["strictly_lytic"], lytic_tip)}
+    {_check_with_hits(amr_label, therapy["no_amr"], therapy.get("_amr_hits"), amr_tip)}
+    {_check_with_hits(virulence_label, therapy["no_virulence"], therapy.get("_vf_hits"), vf_tip)}
+    {_check(integrase_label, therapy["no_integrase"], integrase_tip)}
   </div>
   <div class="card">
     <div class="section-title">🔄 Lifestyle Prediction</div>

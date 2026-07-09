@@ -1040,8 +1040,14 @@ def _parse_therapy_safety(
                 if amr_hits and vf_hits:
                     break
 
-    has_amr = bool(amr_hits)
-    has_vf = bool(vf_hits)
+    # v0.2.7: Pharokka (MMseqs2 sequence search, >=80% id, >=40% cov) is the
+    # SOLE disqualifier for AMR/virulence. Phold foldseek hits are low-identity
+    # fold-match false positives (e.g. a phage's own DHFR -> dfrA26 ~26%; a
+    # tail-spike sialidase -> nanA/nanH ~12-16%), so they never flip the verdict
+    # -- but they stay in _amr_hits/_vf_hits to be shown as informational
+    # structural-homolog notes in the report.
+    has_amr = any("pharokka" in (h.get("source") or "") for h in amr_hits)
+    has_vf = any("pharokka" in (h.get("source") or "") for h in vf_hits)
 
     has_integrase = False
     if phold_gbk and phold_gbk.exists():
