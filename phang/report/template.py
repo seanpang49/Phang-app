@@ -920,9 +920,9 @@ def render_report(d: Dict[str, Any]) -> str:
         else "Virulence factor genes detected"
     )
     integrase_label = (
-        "No integrase / recombinase detected"
+        "No integrase / excisionase detected"
         if therapy["no_integrase"]
-        else "Integrase / recombinase detected"
+        else "Integrase / excisionase detected"
     )
 
     # v0.2.7: hover tooltips explaining how each therapy point is determined.
@@ -946,7 +946,7 @@ def render_report(d: Dict[str, Any]) -> str:
     )
     integrase_tip = (
         "Scan of the Phold annotation (Phold re-annotates Pharokka's gene calls) "
-        "for integrase, excisionase or recombinase — hallmark genes of a "
+        "for integrase or excisionase — hallmark genes of a "
         "lysogenic lifecycle."
     )
 
