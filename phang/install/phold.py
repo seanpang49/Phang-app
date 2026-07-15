@@ -79,6 +79,23 @@ def _install_phold_assets(conda: str, threads: int = _INSTALL_THREADS) -> None:
     ]))
 
 
+def _ensure_phold_pip_deps(conda: str) -> None:
+    """Ensure the tokenizer backend libs phold needs but does not pull in itself.
+
+    ProstT5's tokenizer is a SentencePiece model (``spiece.model``).  Loading it
+    with ``transformers`` requires ``sentencepiece`` (the tokenizer itself) and
+    ``protobuf`` (used by the slow->fast tokenizer conversion).  When they are
+    missing, ``phold install`` aborts while loading the ProstT5 model — first
+    misreporting it as a missing ``tiktoken`` file, then failing on the
+    SentencePiece parse.  Neither is a declared phold/transformers dependency, so
+    install them explicitly.  Idempotent — pip skips whatever is already present.
+    """
+    _run_conda(make_conda_cmd(conda, [
+        "run", "--no-capture-output", "-p", str(ENV_PHOLD),
+        "pip", "install", "sentencepiece", "protobuf",
+    ]))
+
+
 def _phold_search_roots() -> list[Path]:
     search_roots = [DB_PHOLD]
     for desktop_db in Path.home().glob("Desktop/*/phold/db"):
@@ -202,6 +219,7 @@ def ensure_phold() -> str:
             _cleanup_incomplete_phold_assets()
 
     try:
+        _ensure_phold_pip_deps(conda)
         _install_phold_assets(conda)
         installed_db = find_phold_db_dir()
     except subprocess.CalledProcessError as exc:
