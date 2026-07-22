@@ -1,0 +1,12 @@
+# Keep shell scripts LF even when checked out on Windows — wsl_setup.sh is run by
+# bash inside WSL2 and CRLF line endings would break its shebang and `\r` parsing.
+*.sh text eol=lf
+
+# Windows-side scripts stay CRLF.
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Installer/data blobs.
+*.ico binary
+*.png binary
+*.icns binary
