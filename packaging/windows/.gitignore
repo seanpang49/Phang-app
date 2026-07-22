@@ -1,0 +1,3 @@
+# Build output — the installer .exe belongs on a GitHub Release, not in git.
+out/
+dist/
