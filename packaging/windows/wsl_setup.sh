@@ -24,7 +24,7 @@
 #   PHANG_ENV      conda env name                  (default: phang)
 #   PHANG_PY       Python version for the env       (default: 3.11)
 #   MINIFORGE      Miniforge prefix                 (default: $HOME/miniforge3)
-#   PHANG_SRC      phang source: a directory OR a   (default: the git repo URL)
+#   PHANG_SRC      phang source: a directory OR a   (default: the v0.2.8 release tag)
 #                  "git+https://…" URL that pip can install.
 # =============================================================================
 
@@ -35,7 +35,7 @@ set -eo pipefail
 PHANG_ENV="${PHANG_ENV:-phang}"
 PHANG_PY="${PHANG_PY:-3.11}"
 MINIFORGE="${MINIFORGE:-$HOME/miniforge3}"
-PHANG_SRC="${PHANG_SRC:-git+https://github.com/seanpang49/Phang-app.git}"
+PHANG_SRC="${PHANG_SRC:-git+https://github.com/seanpang49/Phang-app.git@v0.2.8}"
 MINIFORGE_URL="https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh"
 
 # --- pretty logging ---------------------------------------------------------

@@ -24,7 +24,7 @@
 .PARAMETER PhangSrc
     Override the phang source: a path or a "git+https://..." URL that pip installs.
     Defaults to a local source tree if this script sits inside the repo,
-    otherwise the public GitHub repo.
+    otherwise the matching release tag of the public GitHub repo.
 
 .PARAMETER NonInteractive
     Never pause for input (for unattended / installer-driven runs).
@@ -98,7 +98,9 @@ if ([string]::IsNullOrEmpty($PhangSrc)) {
     if (Test-Path (Join-Path $RepoRoot "pyproject.toml")) {
         $PhangSrc = ConvertTo-WslPath $RepoRoot
     } else {
-        $PhangSrc = "git+https://github.com/seanpang49/Phang-app.git"
+        # Pinned to the release tag so every Windows install gets exactly the
+        # same phang code as the macOS .pkg of the same version.
+        $PhangSrc = "git+https://github.com/seanpang49/Phang-app.git@v0.2.8"
     }
 }
 
@@ -191,10 +193,14 @@ Info "Creating launchers..."
 $AppDir = Join-Path $env:LOCALAPPDATA "Phang"
 New-Item -ItemType Directory -Force -Path $AppDir | Out-Null
 
-# Copy an icon if one ships with the source tree.
-$IconSrc = Join-Path $ScriptDir "..\..\phang\gui\assets\icon.ico"
+# Copy the icon: it sits next to this script in the release zip / Setup.exe,
+# or under phang\gui\assets when run from a source checkout.
+$IconSrc = @(
+    (Join-Path $ScriptDir "icon.ico"),
+    (Join-Path $ScriptDir "..\..\phang\gui\assets\icon.ico")
+) | Where-Object { Test-Path $_ } | Select-Object -First 1
 $IconPath = $null
-if (Test-Path $IconSrc) {
+if ($IconSrc) {
     $IconPath = Join-Path $AppDir "icon.ico"
     Copy-Item $IconSrc $IconPath -Force
 }

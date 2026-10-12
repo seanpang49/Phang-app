@@ -3,33 +3,38 @@
 **End-to-end bacteriophage genome characterisation — from FASTA to a phage-therapy verdict, in one click.**
 
 [![Latest release](https://img.shields.io/github/v/release/seanpang49/Phang-app?label=download&color=6366f1)](../../releases/latest)
-[![Platform](https://img.shields.io/badge/platform-Apple%20Silicon-000000?logo=apple&logoColor=white)](../../releases/latest)
+[![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-000000?logo=apple&logoColor=white)](../../releases/latest)
+[![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011%20(WSL2)-0078D6?logo=windows&logoColor=white)](../../releases/latest)
 [![License: MIT](https://img.shields.io/github/license/seanpang49/Phang-app?color=brightgreen)](LICENSE)
 [![Downloads](https://img.shields.io/github/downloads/seanpang49/Phang-app/total?color=blue)](../../releases)
 
 Phang takes one or more bacteriophage genome FASTA files and runs a 12-step pipeline across **nine specialised tools** to annotate genes, predict lifestyle and host, place the phage in viral taxonomy, screen for safety red-flags, and judge **phage-therapy suitability** — then packages everything into an interactive HTML report card and a submission-ready NCBI BankIt file.
 
-No terminal, no conda setup: **download the macOS installer, double-click, and run.**
+No terminal, no conda setup: **download the installer for your Mac or Windows PC, double-click, and run.** Both installers carry the same Phang release, so a given version gives the same results on either platform.
 
 ---
 
 ## ✨ Highlights
 
-- **One-click desktop app** for Apple Silicon Macs — no command line needed.
+- **One-click desktop app** for Apple Silicon Macs and Windows 10/11 PCs — no command line needed.
 - **Phage-therapy verdict** — flags whether a phage is a candidate (strictly lytic, and free of antimicrobial-resistance / virulence / lysogeny genes), and shows the evidence behind every call.
 - **Interactive report card** — genome map, gene annotations, lifestyle, predicted host, viral taxonomy, defense systems, depolymerases, and receptor-binding proteins.
 - **Batch dashboard** — analyse many phages at once and compare them at a glance.
 - **NCBI BankIt package** — submission-ready FASTA + feature table.
 - **Nine tools, one workflow** — Pharokka, Phold, Phynteny, PhaStyle, PhaBOX2/CHERRY, vConTACT3, DefenseFinder, PhageRBPdetect, DepoScope.
 
-## 💻 Requirements
+## ⬇️ Download
 
-- Apple Silicon Mac (M1 or later) — runs natively, no Rosetta
-- macOS 11 or later
-- ~35 GB free disk space (a one-time ~30 GB database download on first launch)
-- Internet connection for the first-run setup
+Every release on the **[Releases page](../../releases/latest)** has one file per platform:
 
-## ⬇️ Installation
+| Platform | File | Requirements |
+|---|---|---|
+| **macOS** (Apple Silicon) | `Phang-<version>-MacOSX-arm64.pkg` | M1 or later, macOS 11+ (runs natively, no Rosetta) |
+| **Windows** 10/11 (64-bit) | `Phang-<version>-Windows-x64-Setup.exe` | Windows 11 recommended, or Windows 10 22H2 with WSLg; WSL2 with Ubuntu |
+
+Both need **~40 GB free disk space** and an internet connection for the one-time ~30 GB tool and database download on first launch. On Windows, an NVIDIA GPU with the [CUDA-on-WSL driver](https://developer.nvidia.com/cuda/wsl) speeds up some steps; without one, Phang falls back to the CPU automatically.
+
+## 🍎 Installation — macOS
 
 1. Download **`Phang-<version>-MacOSX-arm64.pkg`** from the **[latest release](../../releases/latest)** and double-click it.
 2. This beta is **unsigned**, so macOS Gatekeeper blocks it the first time:
@@ -38,9 +43,20 @@ No terminal, no conda setup: **download the macOS installer, double-click, and r
 3. Click through the installer (**Continue → Install**; it asks for your Mac password). Phang installs to **/Applications**.
 4. Open **Phang** from Applications or Launchpad. The app is also unsigned, so apply the **same Gatekeeper step once** the first time you open it.
 
+## 🪟 Installation — Windows
+
+Phang's analysis tools are Linux-only (Bioconda), so on Windows they run inside **WSL2** (Windows Subsystem for Linux). The Phang window opens on your normal Windows desktop.
+
+1. **One-time, if WSL2 is not installed yet:** open **PowerShell as Administrator**, run `wsl --install`, restart the PC, and finish the Ubuntu username/password setup.
+2. Download **`Phang-<version>-Windows-x64-Setup.exe`** from the **[latest release](../../releases/latest)** and run it.
+   *No-installer alternative:* download `Phang-<version>-Windows-x64.zip`, unzip it, and double-click **`Install-Phang.bat`**.
+3. This beta is **unsigned**, so Windows SmartScreen warns the first time: click **More info → Run anyway**.
+4. The installer prepares Phang inside WSL2 (a few minutes, needs internet) and adds **Phang** to the Start Menu and Desktop.
+5. Open **Phang** from the Start Menu.
+
 ## 🚀 First launch
 
-On first launch, Phang downloads its analysis tools and reference databases (~30 GB) into `~/.phang`. A progress window shows the status — keep it open. You can quit to pause; finished downloads are kept and it resumes next time.
+On first launch, Phang downloads its analysis tools and reference databases (~30 GB) into `~/.phang` (on Windows, inside WSL2). A progress window shows the status — keep it open. You can quit to pause; finished downloads are kept and it resumes next time.
 
 ## 🧬 Usage
 
@@ -77,11 +93,11 @@ Accepted inputs: a single FASTA file, a folder of FASTA files, or a multi-record
 | 7 | **DefenseFinder + PhageRBPdetect** | Anti-defense systems + receptor-binding proteins | ~10 s |
 | 8 | **DepoScope** | Depolymerase detection | ~21 s |
 | 9–11 | Genome viz · NCBI · Report | Genome map, BankIt package, report card | ~11 s |
-| | | **Total (single genome)** | **~8–9 min** |
+| | | **Total (single genome)** | **~16 min median (12.9-27.9 min, n=35)** |
 
 ## 💊 How the phage-therapy verdict works
 
-A phage is labelled a **candidate** when it is **strictly lytic** *and* shows **no antimicrobial-resistance genes, no virulence factors, and no integrase / recombinase** (lysogeny markers). Antimicrobial-resistance and virulence are judged by Pharokka sequence homology against CARD and VFDB (≥80% identity); low-identity structural look-alikes from Phold are shown as informational notes and do **not** count against a phage. Every call on the report card has a hover tooltip explaining how it was derived.
+A phage is labelled a **candidate** when it is **strictly lytic** *and* shows **no antimicrobial-resistance genes, no virulence factors, and no integrase / excisionase** (lysogeny markers). Antimicrobial-resistance and virulence are judged by Pharokka sequence homology against CARD and VFDB (≥80% identity); low-identity structural look-alikes from Phold are shown as informational notes and do **not** count against a phage. Every call on the report card has a hover tooltip explaining how it was derived.
 
 ## 🙏 Acknowledgements
 

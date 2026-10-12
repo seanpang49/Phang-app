@@ -41,7 +41,14 @@ I/O over `/mnt/c` makes conda env creation and tool runs crawl.
 
 ## Install (for users)
 
-**Easiest:** double-click **`Install-Phang.bat`** (or run the `.exe` once built).
+Download from the [latest release](https://github.com/seanpang49/Phang-app/releases/latest):
+
+- **`Phang-<version>-Windows-x64-Setup.exe`** — run it (adds an Add/Remove-Programs entry), or
+- **`Phang-<version>-Windows-x64.zip`** — unzip, then double-click **`Install-Phang.bat`**.
+
+Both install phang inside WSL2 from the matching release tag
+(`git+https://github.com/seanpang49/Phang-app.git@v<version>`), i.e. exactly the
+same code as the macOS `.pkg` of that version.
 
 **Requirements**
 - Windows 11 (recommended — WSLg shows the GUI) or Windows 10 22H2 with WSLg.
@@ -54,7 +61,15 @@ I/O over `/mnt/c` makes conda env creation and tool runs crawl.
 Advanced: `Install-Phang.bat -SkipBootstrap` sets up phang but defers the 30 GB
 download to the first time you open Phang.
 
-## Build the `.exe` (for maintainers)
+## Build the release files (for maintainers)
+
+Pushing a `v*` tag runs `.github/workflows/windows-installer.yml` on a GitHub
+Windows runner. It checks that the tag, `pyproject.toml`, `phang.iss` and the
+pinned tag in `phang_setup.ps1` / `wsl_setup.sh` all agree, builds the `.zip` and
+the Inno Setup `.exe`, and attaches both to the GitHub Release for that tag. It
+can also be started by hand (Actions → Windows installer → Run workflow).
+
+To build the `.exe` locally instead:
 
 ```powershell
 winget install JRSoftware.InnoSetup      # one-time
@@ -63,7 +78,8 @@ iscc packaging\windows\phang.iss
 ```
 
 > Bumping `version` in `pyproject.toml`? Update `#define AppVer` at the top of
-> `phang.iss` to match.
+> `phang.iss` **and** the `@v<version>` pin in `phang_setup.ps1` and
+> `wsl_setup.sh` to match. The release workflow refuses to build if they differ.
 
 ## Test (on a clean Windows 11 PC)
 

@@ -20,3 +20,6 @@ dist/
 packaging/mac/out/
 packaging/mac/dist/
 packaging/mac/Phang.icns
+
+# Local AI-assistant settings
+.claude/

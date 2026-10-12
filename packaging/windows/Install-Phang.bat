@@ -1,6 +1,6 @@
 @echo off
 REM ===========================================================================
-REM  Phang - Windows (WSL2) installer  ·  one-click entry point
+REM  Phang - Windows (WSL2) installer  -  one-click entry point
 REM ===========================================================================
 REM  Double-click this file to install Phang. It runs phang_setup.ps1 (in the
 REM  same folder) with an execution-policy bypass so you don't have to change

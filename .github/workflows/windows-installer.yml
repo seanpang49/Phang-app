@@ -1,0 +1,87 @@
+# Builds the Windows release files for a tagged Phang release and attaches them
+# to the GitHub Release, next to the macOS .pkg of the same version:
+#   Phang-<ver>-Windows-x64.zip        (Install-Phang.bat + scripts, no installer)
+#   Phang-<ver>-Windows-x64-Setup.exe  (Inno Setup wrapper around the same scripts)
+# Both install phang inside WSL2 from git tag v<ver>, i.e. the same code as the .pkg.
+name: Windows installer
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build and attach to (e.g. v0.2.8)"
+        required: true
+        default: "v0.2.8"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.inputs.tag || github.ref_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref }}
+
+      - name: Check every version string matches the tag
+        shell: pwsh
+        run: |
+          $ver = $env:TAG.TrimStart('v')
+          $py  = (Select-String -Path pyproject.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
+          $iss = (Select-String -Path packaging/windows/phang.iss -Pattern '#define AppVer "(.+)"').Matches[0].Groups[1].Value
+          $ps1 = (Select-String -Path packaging/windows/phang_setup.ps1 -Pattern 'Phang-app\.git@v([0-9.]+)').Matches[0].Groups[1].Value
+          $sh  = (Select-String -Path packaging/windows/wsl_setup.sh -Pattern 'Phang-app\.git@v([0-9.]+)').Matches[0].Groups[1].Value
+          Write-Host "tag=$ver pyproject=$py phang.iss=$iss phang_setup.ps1=$ps1 wsl_setup.sh=$sh"
+          if (($py, $iss, $ps1, $sh) | Where-Object { $_ -ne $ver }) { throw "Version mismatch - fix before releasing." }
+          "VER=$ver" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
+      - name: Build zip
+        shell: pwsh
+        run: |
+          $name = "Phang-$env:VER-Windows-x64"
+          New-Item -ItemType Directory -Path "dist/$name" -Force | Out-Null
+          Copy-Item packaging/windows/Install-Phang.bat, packaging/windows/phang_setup.ps1, packaging/windows/wsl_setup.sh, packaging/windows/README.md, LICENSE -Destination "dist/$name/"
+          Copy-Item phang/gui/assets/icon.ico -Destination "dist/$name/icon.ico"
+          Compress-Archive -Path "dist/$name" -DestinationPath "dist/$name.zip" -Force
+
+      - name: Build Setup.exe (Inno Setup)
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+          & $iscc packaging\windows\phang.iss
+          if ($LASTEXITCODE -ne 0) { throw "ISCC failed" }
+
+      - name: Attach to the GitHub Release
+        shell: pwsh
+        run: |
+          $zip = "dist/Phang-$env:VER-Windows-x64.zip"
+          $exe = "packaging/windows/out/Phang-$env:VER-Windows-x64-Setup.exe"
+          gh release view $env:TAG --repo $env:GITHUB_REPOSITORY --json tagName | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $env:TAG --repo $env:GITHUB_REPOSITORY --title "Phang $env:VER" --notes "Phang $env:VER"
+          }
+          gh release upload $env:TAG $zip $exe --clobber --repo $env:GITHUB_REPOSITORY
+          Get-FileHash $zip, $exe -Algorithm SHA256 | Format-Table -AutoSize
+
+      - name: Mention Windows in the release title and notes
+        shell: pwsh
+        run: |
+          $title = "Phang $env:VER — macOS (Apple Silicon) + Windows (WSL2) beta"
+          $body  = gh release view $env:TAG --repo $env:GITHUB_REPOSITORY --json body -q .body | Out-String
+          if ($body -notmatch 'Windows-x64-Setup\.exe') {
+            $win = @"
+
+          ### Windows 10/11 (WSL2)
+          Download **Phang-$env:VER-Windows-x64-Setup.exe** and run it (or unzip **Phang-$env:VER-Windows-x64.zip** and double-click ``Install-Phang.bat``). WSL2 with Ubuntu is required; if it is missing, run ``wsl --install`` in an Administrator PowerShell and restart first. The installer is unsigned: on the SmartScreen warning click **More info → Run anyway**. It installs exactly the same Phang $env:VER code as the macOS .pkg (from git tag $env:TAG), and first launch downloads the same ~30 GB of tools and databases.
+          "@
+            $body = $body.TrimEnd() + "`n" + ($win -replace '(?m)^          ', '')
+          }
+          $body | Out-File -FilePath notes.md -Encoding utf8
+          gh release edit $env:TAG --repo $env:GITHUB_REPOSITORY --title "$title" --notes-file notes.md

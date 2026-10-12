@@ -35,7 +35,7 @@ bash packaging/mac/build.sh
 
 `build.sh` (1) builds the `phang` wheel into `dist/`, (2) generates `Phang.icns`
 from `phang/gui/assets/icon.png`, and (3) runs `constructor --platform osx-arm64`.
-Output: `packaging/mac/out/Phang-0.2.0-osx-arm64.pkg`.
+Output: `packaging/mac/out/Phang-<version>-MacOSX-arm64.pkg`.
 
 > Bumping `version` in `pyproject.toml`? Also update the wheel filename in
 > `construct.yaml`'s `extra_files:` — `build.sh` fails loudly if they diverge.

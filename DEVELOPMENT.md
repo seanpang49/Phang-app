@@ -21,7 +21,14 @@ The simplest way to run Phang — no terminal, no conda setup. Download the inst
 
 > Requires an Apple Silicon Mac (M1 or later), macOS 11+, ~35 GB free disk space, and an internet connection for the one-time first-run setup. Runs natively on Apple Silicon (no Rosetta).
 
-_A Windows (WSL2) one-click installer is in progress._
+### Windows 10/11 (WSL2)
+
+1. If WSL2 is not installed yet: open **PowerShell as Administrator**, run `wsl --install`, restart, and finish the Ubuntu user setup.
+2. **Download `Phang-<version>-Windows-x64-Setup.exe`** from the [latest release](../../releases/latest) and run it (or download `Phang-<version>-Windows-x64.zip`, unzip it, and double-click `Install-Phang.bat`).
+3. The beta is unsigned: on the SmartScreen warning click **More info → Run anyway**.
+4. Open **Phang** from the Start Menu. First launch downloads the same ~30 GB of tools and databases as on macOS, into `~/.phang` inside WSL2.
+
+> Requires 64-bit Windows 11 (recommended) or Windows 10 22H2 with WSLg, WSL2 with Ubuntu, ~40 GB free disk space, and an internet connection. The Windows installer installs the same tagged release as the macOS `.pkg` of the same version.
 
 Prefer to install from source, or running on Intel Mac / Linux / Windows today? Use the developer instructions below.
 
