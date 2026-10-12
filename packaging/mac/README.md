@@ -40,7 +40,7 @@ Output: `packaging/mac/out/Phang-<version>-MacOSX-arm64.pkg`.
 > Bumping `version` in `pyproject.toml`? Also update the wheel filename in
 > `construct.yaml`'s `extra_files:` — `build.sh` fails loudly if they diverge.
 
-## Test (on a clean Apple Silicon Mac)
+## Release check (on an Apple Silicon Mac)
 
 1. Copy the `.pkg` over and double-click it; complete the installer.
 2. Open **Phang** from `/Applications`. Because the beta is unsigned, the first
@@ -64,5 +64,3 @@ Logs: `~/Library/Logs/Phang/phang-gui.log`. Data: `~/.phang/` (envs + databases)
 
 - **Signing + notarization** (Developer ID) to drop the right-click-Open step.
 - **Intel (`osx-64`) build** — deferred; this beta is Apple Silicon only.
-- **Clean-Mac end-to-end test** must be run on a second machine — it cannot be
-  validated on the build machine.

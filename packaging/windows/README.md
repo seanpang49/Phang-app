@@ -81,7 +81,7 @@ iscc packaging\windows\phang.iss
 > `phang.iss` **and** the `@v<version>` pin in `phang_setup.ps1` and
 > `wsl_setup.sh` to match. The release workflow refuses to build if they differ.
 
-## Test (on a clean Windows 11 PC)
+## Release check (on a Windows 11 PC)
 
 1. Run the installer; if WSL2 is absent it guides `wsl --install` + reboot.
 2. Confirm the `phang` env is created and phang installs
@@ -100,5 +100,3 @@ Data: `~/.phang/` inside WSL2 (envs + databases).
   this beta is intentionally unsigned, mirroring the unsigned macOS beta.
 - **Windows 10 without WSLg** — GUI needs WSLg; on older builds use an X server
   (VcXsrv) or run headless via `wsl -- bash ~/.phang-setup/wsl_setup.sh run -i … -o …`.
-- A **clean-PC end-to-end test** must be run on a second machine — it cannot be
-  fully validated on the build machine.
